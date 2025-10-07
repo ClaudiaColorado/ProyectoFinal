@@ -211,45 +211,40 @@ jobs:
             exit 1
           fi
         fi  
-    - name: Validate Workflow Configuration
-      run: |
-        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
-        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
-        WORKFLOW_NAME="WF_ProyectoFinal"
-        
-        echo "🔍 Validando la configuración del workflow creado..."
-        
-        # Obtener lista de workflows y encontrar el recién creado
-        workflows_list=$(curl -s -X GET \
-          -H "Authorization: Bearer $DEST_TOKEN" \
-          "$DEST_HOST/api/2.1/jobs/list")
-        
-        job_id=$(echo "$workflows_list" | jq -r --arg name "$WORKFLOW_NAME" '.jobs[]? | select(.settings.name == $name) | .job_id')
-        
-        if [ "$job_id" != "" ] && [ "$job_id" != "null" ]; then
-          echo "✅ Workflow encontrado con ID: $job_id"
-          
-          # Obtener configuración detallada
-          job_details=$(curl -s -X GET \
-            -H "Authorization: Bearer $DEST_TOKEN" \
-            "$DEST_HOST/api/2.1/jobs/get?job_id=$job_id")
-          
-          echo "📋 Resumen del workflow:"
-          echo "Nombre: $(echo "$job_details" | jq -r '.settings.name')"
-          echo "Número de tareas: $(echo "$job_details" | jq '.settings.tasks | length')"
-          echo ""
-          echo "📝 Tareas configuradas:"
-          echo "$job_details" | jq -r '.settings.tasks[] | "- " + .task_key + " → " + .notebook_task.notebook_path'
-          echo ""
-          echo "🖥️  Cluster configurado:"
-          echo "Cluster ID: $(echo "$job_details" | jq -r '.settings.tasks[0].existing_cluster_id')"
-          echo "Cluster Name: cluster_SD (reutilizado)"
-          
-        else
-          echo "❌ No se pudo encontrar el workflow creado"
-          exit 1
-        fi
-    
+- name: 🔎 Validar workflow (parche anti-jq exit code 3)
+  shell: bash
+  run: |
+    set -euo pipefail
+
+    get_json () {
+      local url="$1"
+      local resp code body
+      resp=$(curl -sS -H "Authorization: Bearer $DEST_TOKEN"                     -H "Content-Type: application/json"                     "$url" -w '\n%{http_code}')
+      code=$(echo "$resp" | tail -n1)
+      body=$(echo "$resp" | sed '$d')
+
+      if [[ ! "$code" =~ ^2 ]]; then
+        echo "❌ HTTP $code en $url"
+        echo "—— Body crudo ——"
+        echo "$body"
+        exit 1
+      fi
+      if ! echo "$body" | jq -e . >/dev/null 2>&1; then
+        echo "❌ Respuesta no es JSON válido en $url"
+        echo "—— Body crudo ——"
+        echo "$body"
+        exit 1
+      fi
+      printf '%s' "$body"
+    }
+
+    echo "🔍 Validando la configuración del workflow creado..."
+    WF_JSON=$(get_json "$DEST_HOST/api/2.1/jobs/get?job_id=${WORKFLOW_ID}")
+
+    echo "✅ Workflow encontrado con ID: $(echo "$WF_JSON" | jq -r '.job_id')"
+    echo "🧩 Nombre: $(echo "$WF_JSON" | jq -r '.settings.name')"
+    echo "📦 Tareas:"
+    echo "$WF_JSON" | jq -r '.settings.tasks[] | "- \(.task_key) -> \(.notebook_task.notebook_path)"'
     - name: Execute Workflow WF_ProyectoFinal
       run: |
         DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
