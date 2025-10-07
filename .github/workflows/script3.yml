@@ -242,7 +242,7 @@ jobs:
             "environment": "production",
             "created_by": "github_actions",
             "project": "automated_deployment",
-            "cluster_used": "cluster_SD"
+            "cluster_used": "cluster_SD_Prod"
           }
         }
         EOF
@@ -260,7 +260,7 @@ jobs:
         job_id=$(echo "$create_response" | jq -r '.job_id')
         
         if [ "$job_id" != "" ] && [ "$job_id" != "null" ]; then
-          echo "✅ Workflow 'WF_ADB' creado exitosamente con ID: $job_id"
+          echo "✅ Workflow 'WF_ProyectoFinal' creado exitosamente con ID: $job_id"
           
           # Obtener detalles del workflow creado
           workflow_details=$(curl -s -X GET \
@@ -279,7 +279,7 @@ jobs:
       run: |
         DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
         DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
-        WORKFLOW_NAME="WF_ADB"
+        WORKFLOW_NAME="WF_ProyectoFinal"
         
         echo "🔍 Validando la configuración del workflow creado..."
         
@@ -314,11 +314,11 @@ jobs:
           exit 1
         fi
     
-    - name: Execute Workflow WF_ADB
+    - name: Execute Workflow WF_ProyectoFinal
       run: |
         DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
         DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
-        WORKFLOW_NAME="WF_ADB"
+        WORKFLOW_NAME="WF_ProyectoFinal"
         
         echo "🚀 Ejecutando workflow: $WORKFLOW_NAME"
         
@@ -330,7 +330,7 @@ jobs:
         job_id=$(echo "$workflows_list" | jq -r --arg name "$WORKFLOW_NAME" '.jobs[]? | select(.settings.name == $name) | .job_id')
         
         if [ "$job_id" != "" ] && [ "$job_id" != "null" ]; then
-          echo "✅ Workflow encontrado con ID: $job_id"
+          echo "✅ Workflow WF_ProyectoFinal encontrado con ID: $job_id"
           
           # Ejecutar el workflow
           run_response=$(curl -s -X POST \
@@ -367,7 +367,7 @@ jobs:
         RUN_ID="${{ env.WORKFLOW_RUN_ID }}"
         JOB_ID="${{ env.WORKFLOW_JOB_ID }}"
         
-        echo "📊 Monitoreando ejecución del workflow..."
+        echo "📊 Monitoreando ejecución del workflow WF_ProyectoFinal..."
         echo "Job ID: $JOB_ID"
         echo "Run ID: $RUN_ID"
         
@@ -393,7 +393,7 @@ jobs:
           case "$state" in
             "TERMINATED")
               if [ "$result_state" = "SUCCESS" ]; then
-                echo "🎉 ¡Workflow completado exitosamente!"
+                echo "🎉 ¡Workflow WF_ProyectoFinal completado exitosamente!"
                 
                 # Mostrar resumen final
                 echo ""
@@ -422,7 +422,7 @@ jobs:
               ;;
             *)
               # Estados: PENDING, RUNNING, TERMINATING
-              echo "⏳ Workflow aún ejecutándose..."
+              echo "⏳ Workflow WF_ProyectoFinal aún ejecutándose..."
               ;;
           esac
           
@@ -445,11 +445,14 @@ jobs:
         echo "🎉 ¡Despliegue y ejecución completados exitosamente!"
         echo ""
         echo "📊 Resumen:"
-        echo "✅ Notebooks desplegados: ntbk_1, ntbk_2"
-        echo "✅ Workflow creado: WF_ADB"
+        echo "✅ Notebooks desplegados: drop_medallion, 00_prep_env, 01_ingest, 02_transform, C"
+        echo "✅ Workflow creado: WF_ProyectoFinal"
         echo "✅ Tareas configuradas:"
-        echo "   - tarea1_notebook1 (ntbk_1)"
-        echo "   - tarea2_notebook2 (ntbk_2)"
+        echo "   - tarea1_notebook1 (drop_medallion)"
+        echo "   - tarea2_notebook2 (00_prep_env)"
+        echo "   - tarea3_notebook2 (01_ingest)"
+        echo "   - tarea4_notebook2 (02_transform)"
+        echo "   - tarea5_notebook2 (02_transform)"
         echo "✅ Cluster existente: cluster_SD configurado"
         echo "🚀 Workflow ejecutado automáticamente"
         echo ""
