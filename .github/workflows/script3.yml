@@ -212,19 +212,43 @@ jobs:
           fi
         fi
     - name: "Validar workflow (anti-jq exit code 3)"
-      shell: bash
-      run: |
+      env:
+          DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
+          DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
+          # Si en pasos previos hiciste: echo "WORKFLOW_ID=..." >> $GITHUB_ENV
+          # entonces aquí lo recuperamos. Si no existe, más abajo hacemos fallback por nombre.
+          WORKFLOW_ID: ${{ env.WORKFLOW_ID }}
+        shell: bash
+        run: |
           set -euo pipefail
+
+          # Usar variables locales seguras (y permitir fallback a DATABRICKS_* si existieran)
+          HOST="${DEST_HOST:-${DATABRICKS_HOST:-}}"
+          TOKEN="${DEST_TOKEN:-${DATABRICKS_TOKEN:-}}"
+
+          if [[ -z "$HOST" || -z "$TOKEN" ]]; then
+            echo "❌ Falta DEST_HOST/DEST_TOKEN en este step"; exit 1
+          fi
+
+          # Si WORKFLOW_ID no viene en env, lo resolvemos por nombre
+          if [[ -z "${WORKFLOW_ID:-}" || "${WORKFLOW_ID}" == "null" ]]; then
+            WORKFLOW_ID=$(curl -sS -H "Authorization: Bearer $TOKEN" \
+                               "$HOST/api/2.1/jobs/list" \
+                         | jq -r '.jobs[] | select(.settings.name=="WF_ProyectoFinal") | .job_id' \
+                         | head -n1)
+            if [[ -z "$WORKFLOW_ID" ]]; then
+              echo "❌ No se pudo resolver WORKFLOW_ID por nombre"; exit 1
+            fi
+          fi
 
           get_json() {
             local url="$1"
             local resp code body
-            resp=$(curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
+            resp=$(curl -sS -H "Authorization: Bearer $TOKEN" \
                            -H "Content-Type: application/json" \
                            "$url" -w $'\n%{http_code}')
             code=$(echo "$resp" | tail -n1)
             body=$(echo "$resp" | sed '$d')
-
             if [[ ! "$code" =~ ^2 ]]; then
               echo "HTTP $code in $url"
               echo "BODY (raw):"
@@ -241,13 +265,13 @@ jobs:
           }
 
           echo "Validating workflow configuration..."
-          WF_JSON=$(get_json "${DEST_HOST}/api/2.1/jobs/get?job_id=${WORKFLOW_ID}")
+          WF_JSON=$(get_json "${HOST}/api/2.1/jobs/get?job_id=${WORKFLOW_ID}")
 
           echo "Workflow found: $(echo "$WF_JSON" | jq -r '.job_id')"
           echo "Name: $(echo "$WF_JSON" | jq -r '.settings.name')"
           echo "Tasks:"
           echo "$WF_JSON" | jq -r '.settings.tasks[] | "- \(.task_key) -> \(.notebook_task.notebook_path)"'
-     
+    
     - name: Execute Workflow WF_ProyectoFinal
       run: |
         DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
