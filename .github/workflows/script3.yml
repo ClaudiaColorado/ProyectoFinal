@@ -388,7 +388,7 @@ jobs:
         echo "   - tarea2_notebook2 (00_prep_env)"
         echo "   - tarea3_notebook2 (01_ingest)"
         echo "   - tarea4_notebook2 (02_transform)"
-        echo "   - tarea5_notebook2 (02_transform)"
+        echo "   - tarea5_notebook2 (03_load)"
         echo "✅ Cluster existente: cluster_SD configurado"
         echo "🚀 Workflow ejecutado automáticamente"
         echo ""
