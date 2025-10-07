@@ -1,4 +1,4 @@
-ame: Dynamic Databricks Proyecto Final Deploy v2
+name: Dynamic Databricks Proyecto Final Deploy v2
 on:
   push:
     branches:
