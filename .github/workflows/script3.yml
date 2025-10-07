@@ -22,7 +22,8 @@ jobs:
           sudo apt-get install -y jq
 
       - name: Setup Databricks CLI
-        uses: databricks/setup-cli@v0
+        uses: databricks/setup-cli@v0.270.0
+
 
       # ⬇️ Respetar tus variables si ya vienen definidas; si no, tomar de secrets/vars
       - name: Cargar variables (conservar existentes)
