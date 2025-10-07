@@ -1,4 +1,4 @@
-name: Deploy Databricks Workflow (WF_ProyectoFinalv1)
+name: Deploy Databricks Workflow (WF_ProyectoFinal)
 
 on:
   workflow_dispatch:
@@ -24,25 +24,36 @@ jobs:
       - name: Setup Databricks CLI
         uses: databricks/setup-cli@v0.270.0
 
-
-      # ⬇️ Respetar tus variables si ya vienen definidas; si no, tomar de secrets/vars
-      - name: Cargar variables (conservar existentes)
+      # 🔐 Unificamos credenciales DEST y respetamos tus variables existentes
+      - name: Exportar variables DEST al entorno
         shell: bash
         run: |
           set -euo pipefail
-          : "${DEST_HOST:=${{ secrets.DEST_HOST }}}"
-          : "${DEST_TOKEN:=${{ secrets.DEST_TOKEN }}}"
-          : "${DEST_CLUSTER_ID:=${{ vars.DEST_CLUSTER_ID }}}"
-          : "${WORKSPACE_BASE:=${{ vars.WORKSPACE_BASE }}}"
+          # DEST: preferimos variables ya definidas; si no, caemos a secrets/vars
+          HOST="${DEST_HOST:-${{ secrets.DEST_HOST }}}"
+          [[ -z "$HOST" ]] && HOST="${{ secrets.DATABRICKS_DEST_HOST }}"
+          TOKEN="${DEST_TOKEN:-${{ secrets.DEST_TOKEN }}}"
+          [[ -z "$TOKEN" ]] && TOKEN="${{ secrets.DATABRICKS_DEST_TOKEN }}"
+          CLUSTER="${DEST_CLUSTER_ID:-${{ vars.DEST_CLUSTER_ID }}}"
+          BASE="${WORKSPACE_BASE:-${{ vars.WORKSPACE_BASE }}}"
 
-          # Exponer host/base/cluster a siguientes steps (no exponemos el token)
-          echo "DEST_HOST=$DEST_HOST" >> $GITHUB_ENV
-          echo "DEST_CLUSTER_ID=$DEST_CLUSTER_ID" >> $GITHUB_ENV
-          echo "WORKSPACE_BASE=$WORKSPACE_BASE" >> $GITHUB_ENV
+          if [[ -z "$HOST" ]]; then echo "❌ Falta DEST_HOST (o secret DEST_HOST / DATABRICKS_DEST_HOST)"; exit 1; fi
+          if [[ -z "$TOKEN" ]]; then echo "❌ Falta DEST_TOKEN (o secret DEST_TOKEN / DATABRICKS_DEST_TOKEN)"; exit 1; fi
+          if [[ -z "$CLUSTER" ]]; then echo "❌ Falta DEST_CLUSTER_ID (o var DEST_CLUSTER_ID)"; exit 1; fi
+          if [[ -z "$BASE" ]]; then echo "❌ Falta WORKSPACE_BASE (o var WORKSPACE_BASE)"; exit 1; fi
 
-          echo "🚩 DEST_HOST=$DEST_HOST"
-          echo "🚩 DEST_CLUSTER_ID=$DEST_CLUSTER_ID"
-          echo "🚩 WORKSPACE_BASE=$WORKSPACE_BASE"
+          echo "DEST_HOST=$HOST" >> $GITHUB_ENV
+          echo "DEST_CLUSTER_ID=$CLUSTER" >> $GITHUB_ENV
+          echo "WORKSPACE_BASE=$BASE" >> $GITHUB_ENV
+
+          # El CLI usa estos dos nombres:
+          echo "DATABRICKS_HOST=$HOST" >> $GITHUB_ENV
+          echo "::add-mask::$TOKEN"
+          echo "DATABRICKS_TOKEN=$TOKEN" >> $GITHUB_ENV
+
+          echo "🚩 DEST_HOST=$HOST"
+          echo "🚩 DEST_CLUSTER_ID=$CLUSTER"
+          echo "🚩 WORKSPACE_BASE=$BASE"
 
       - name: Mostrar tareas del workflow
         shell: bash
@@ -54,11 +65,42 @@ jobs:
           echo "  4) 🔄  02_transform"
           echo "  5) 🛢️⬆️ 03_load"
 
+      # ⬇️ Export desde ORIGIN si hay secrets de origen (se omite si no existen)
+      - name: Export multiple notebooks (raw) desde ORIGIN (opcional)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ORIGIN_HOST='${{ secrets.DATABRICKS_ORIGIN_HOST }}'
+          ORIGIN_TOKEN='${{ secrets.DATABRICKS_ORIGIN_TOKEN }}'
+          # Usa ORIGIN_WORKSPACE_BASE si existe, sino el mismo WORKSPACE_BASE
+          ORIGIN_BASE='${{ vars.ORIGIN_WORKSPACE_BASE }}'
+          if [[ -z "$ORIGIN_BASE" || "$ORIGIN_BASE" == "null" ]]; then ORIGIN_BASE="${WORKSPACE_BASE}"; fi
+
+          if [[ -z "$ORIGIN_HOST" || -z "$ORIGIN_TOKEN" ]]; then
+            echo "ℹ️ No hay credenciales de ORIGIN: se omite export."
+          else
+            echo "📤 Exportando desde ORIGIN: ${ORIGIN_BASE} → ./exported"
+            mkdir -p exported
+            DATABRICKS_HOST="$ORIGIN_HOST" DATABRICKS_TOKEN="$ORIGIN_TOKEN" \
+              databricks workspace export-dir "$ORIGIN_BASE" ./exported --overwrite
+          fi
+
+      # ⬇️ Import a DEST: si hay ./exported, lo sube; si no, continúa (asumes ya están en el workspace)
+      - name: Deploy notebooks to Destination Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -d "./exported" ]]; then
+            echo "📥 Importando a DEST: ./exported → ${WORKSPACE_BASE}"
+            databricks workspace import-dir ./exported "${WORKSPACE_BASE}" --overwrite
+          else
+            echo "ℹ️ No existe ./exported; se asume que los notebooks ya están en ${WORKSPACE_BASE}."
+          fi
+
       - name: Render job.json
         shell: bash
         run: |
           set -euo pipefail
-
           cat > job.json <<'JSON'
           {
             "name": "WF_ProyectoFinal",
@@ -104,26 +146,12 @@ jobs:
 
           sed -i "s#__WORKSPACE_BASE__#${WORKSPACE_BASE}#g" job.json
           sed -i "s/__CLUSTER_ID__/${DEST_CLUSTER_ID}/g" job.json
-
           jq . job.json
 
       - name: Upsert del job (create o reset)
         shell: bash
-        env:
-          DATABRICKS_HOST: ${{ env.DEST_HOST }}
-          # Si no está en secrets, usa el que venga de tu entorno previo:
-          DATABRICKS_TOKEN: ${{ secrets.DEST_TOKEN }}
         run: |
           set -euo pipefail
-          # fallback al DEST_TOKEN exportado por ti si el secret no está seteado
-          if [[ -z "${DATABRICKS_TOKEN:-}" ]]; then
-            DATABRICKS_TOKEN="${DEST_TOKEN:-}"
-          fi
-          if [[ -z "${DATABRICKS_TOKEN}" ]]; then
-            echo "❌ Falta DATABRICKS_TOKEN/DEST_TOKEN"; exit 1
-          fi
-          export DATABRICKS_TOKEN
-
           JOB_ID=$(databricks jobs list --output JSON | jq -r '.jobs[] | select(.settings.name=="WF_ProyectoFinal") | .job_id' || true)
           if [ -n "${JOB_ID}" ]; then
             echo "Job existente: ${JOB_ID} → reset con nueva configuración"
@@ -139,19 +167,11 @@ jobs:
           echo "JOB_ID=${JOB_ID}" >> $GITHUB_ENV
           echo "✅ Job listo con ID: ${JOB_ID}"
 
-      # 🔎 Validación robusta (evita exit code 3 de jq)
+      # 🔎 Validación robusta: separa código HTTP y body, y valida JSON (anti exit code 3)
       - name: Validar workflow y evitar exit code 3 de jq
         shell: bash
-        env:
-          HOST: ${{ env.DEST_HOST }}
-          # mismo enfoque de fallback para el token:
-          TOKEN_SECRET: ${{ secrets.DEST_TOKEN }}
         run: |
           set -Eeuo pipefail
-          TOKEN="${TOKEN_SECRET:-${DEST_TOKEN:-}}"
-          if [[ -z "${TOKEN}" ]]; then
-            echo "❌ Falta token (DEST_TOKEN/secret)"; exit 1
-          fi
 
           call_api () {
             local method="$1"
@@ -160,12 +180,12 @@ jobs:
 
             if [[ -n "$body" ]]; then
               resp=$(curl -sS -X "$method" "$url" \
-                -H "Authorization: Bearer $TOKEN" \
+                -H "Authorization: Bearer $DATABRICKS_TOKEN" \
                 -H "Content-Type: application/json" \
                 -d "$body" -w '\n%{http_code}')
             else
               resp=$(curl -sS -X "$method" "$url" \
-                -H "Authorization: Bearer $TOKEN" \
+                -H "Authorization: Bearer $DATABRICKS_TOKEN" \
                 -H "Content-Type: application/json" \
                 -w '\n%{http_code}')
             fi
@@ -191,11 +211,7 @@ jobs:
           }
 
           echo "🔍 Validando la configuración del workflow creado..."
-          if [[ -z "${JOB_ID:-}" ]]; then
-            echo "❌ JOB_ID no está en el entorno"; exit 1
-          fi
-
-          WF=$(call_api GET "$HOST/api/2.1/jobs/get?job_id=${JOB_ID}")
+          WF=$(call_api GET "$DATABRICKS_HOST/api/2.1/jobs/get?job_id=${JOB_ID}")
           echo "✅ Workflow encontrado con ID: $(echo "$WF" | jq -r '.job_id')"
           echo "🧩 Nombre: $(echo "$WF" | jq -r '.settings.name')"
           echo "📦 Tareas:"
@@ -204,19 +220,8 @@ jobs:
       - name: Ejecutar workflow (opcional) y esperar a que termine
         if: ${{ inputs.run_now }}
         shell: bash
-        env:
-          DATABRICKS_HOST: ${{ env.DEST_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DEST_TOKEN }}
         run: |
           set -euo pipefail
-          if [[ -z "${DATABRICKS_TOKEN:-}" ]]; then
-            DATABRICKS_TOKEN="${DEST_TOKEN:-}"
-          fi
-          if [[ -z "${DATABRICKS_TOKEN}" ]]; then
-            echo "❌ Falta DATABRICKS_TOKEN/DEST_TOKEN"; exit 1
-          fi
-          export DATABRICKS_TOKEN
-
           echo "⏩ Lanzando ejecución para JOB_ID=${JOB_ID}"
           RUN_OUT=$(databricks jobs run-now --job-id "${JOB_ID}")
           echo "$RUN_OUT" | jq .
@@ -237,8 +242,6 @@ jobs:
       - name: Resumen con iconos
         if: ${{ always() }}
         shell: bash
-        env:
-          DATABRICKS_HOST: ${{ env.DEST_HOST }}
         run: |
           cat << EOF >> $GITHUB_STEP_SUMMARY
           ## 🧭 Pipeline — Proyecto Final
