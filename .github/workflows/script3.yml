@@ -211,6 +211,7 @@ jobs:
             exit 1
           fi
         fi
+    
     - name: "Validar workflow (anti-jq exit code 3)"
       env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
