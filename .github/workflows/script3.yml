@@ -1,258 +1,395 @@
-name: Deploy Databricks Workflow (WF_ProyectoFinal)
-
+ame: Dynamic Databricks Proyecto Final Deploy v2
 on:
-  workflow_dispatch:
-    inputs:
-      run_now:
-        description: "Ejecutar el workflow después del deploy"
-        type: boolean
-        default: true
-
+  push:
+    branches:
+      - main
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+    
+    - name: Install jq & curl
+      run: sudo apt-get update && sudo apt-get install -y jq curl
+    
+    - name: Export multiple notebooks (raw)
+      run: |
+        ORIGIN_HOST=${{ secrets.DATABRICKS_ORIGIN_HOST }}
+        ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
+        NOTEBOOK_BASE="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
+        NOTEBOOKS=("drop_medallion" "00_prep_env" "01_ingest" "02_transform" "03_load")  # Agrega más según necesitesas
+        mkdir -p notebooks_to_deploy
+        for nb in "${NOTEBOOKS[@]}"; do
+          echo "Exportando $nb en modo raw..."
+          curl -s -X GET \
+            -H "Authorization: Bearer $ORIGIN_TOKEN" \
+            "$ORIGIN_HOST/api/2.0/workspace/export?path=$NOTEBOOK_BASE/$nb&format=SOURCE&direct_download=true" \
+            --output "notebooks_to_deploy/$nb.py"
+        done
+    
+    - name: Deploy notebooks to Destination Workspace
+      run: |
+        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
+        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+        DEST_BASE="/py/scripts/main"
+        for file in notebooks_to_deploy/*.py; do
+          name=$(basename "$file" .py)
+          dest_path="$DEST_BASE/$name"
+          echo "Creando carpeta $DEST_BASE si no existe..."
+          curl -s -X POST \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"path\":\"$DEST_BASE\"}" \
+            "$DEST_HOST/api/2.0/workspace/mkdirs"
+          echo "Importando $file → $dest_path"
+          response=$(curl -s -X POST \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            -H "Content-Type: multipart/form-data" \
+            -F "path=$dest_path" \
+            -F "format=SOURCE" \
+            -F "language=PYTHON" \
+            -F "overwrite=true" \
+            -F "content=@$file" \
+            "$DEST_HOST/api/2.0/workspace/import")
+          echo "Response: $response"
+        done
+    
+    - name: Check if workflow exists and delete if necessary
+      run: |
+        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
+        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+        WORKFLOW_NAME="WF_ADB"
+        
+        echo "Verificando si existe el workflow: $WORKFLOW_NAME"
+        
+        # Listar todos los workflows y buscar por nombre
+        workflows_response=$(curl -s -X GET \
+          -H "Authorization: Bearer $DEST_TOKEN" \
+          "$DEST_HOST/api/2.1/jobs/list")
+        
+        # Extraer job_id si existe el workflow
+        existing_job_id=$(echo "$workflows_response" | jq -r --arg name "$WORKFLOW_NAME" '.jobs[]? | select(.settings.name == $name) | .job_id')
+        
+        if [ "$existing_job_id" != "" ] && [ "$existing_job_id" != "null" ]; then
+          echo "Workflow encontrado con ID: $existing_job_id. Eliminando..."
+          delete_response=$(curl -s -X POST \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"job_id\": $existing_job_id}" \
+            "$DEST_HOST/api/2.1/jobs/delete")
+          echo "Delete response: $delete_response"
+        else
+          echo "No se encontró workflow existente con nombre: $WORKFLOW_NAME"
+        fi
+    
+    - name: Get existing cluster ID
+      run: |
+        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
+        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+        CLUSTER_NAME="cluster_SD"
+        
+        echo "Buscando cluster existente: $CLUSTER_NAME"
+        
+        # Obtener lista de clusters
+        clusters_response=$(curl -s -X GET \
+          -H "Authorization: Bearer $DEST_TOKEN" \
+          "$DEST_HOST/api/2.0/clusters/list")
+        
+        echo "Clusters response: $clusters_response"
+        
+        # Extraer cluster_id del cluster especificado
+        cluster_id=$(echo "$clusters_response" | jq -r --arg name "$CLUSTER_NAME" '.clusters[]? | select(.cluster_name == $name) | .cluster_id')
+        
+        if [ "$cluster_id" != "" ] && [ "$cluster_id" != "null" ]; then
+          echo "✅ Cluster encontrado: $CLUSTER_NAME con ID: $cluster_id"
+          echo "CLUSTER_ID=$cluster_id" >> $GITHUB_ENV
+        else
+          echo "❌ No se encontró el cluster: $CLUSTER_NAME"
+          echo "Clusters disponibles:"
+          echo "$clusters_response" | jq -r '.clusters[]? | .cluster_name'
+          exit 1
+        fi
+    
+    - name: Create Databricks Workflow WF_ProyectoFinal
+      run: |
+        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
+        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+        DEST_BASE="/py/scripts/main"
+        CLUSTER_ID="${{ env.CLUSTER_ID }}"
 
-      - name: Asegurar jq
-        shell: bash
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y jq
+        echo "Creando workflow: WF_ProyectoFinal con cluster existente ID: $CLUSTER_ID"
 
-      - name: Setup Databricks CLI
-        uses: databricks/setup-cli@v0.270.0
+        # 1) Construir JSON válido (sin comas finales ni '...' ni comillas rotas)
+        #    Usamos placeholders y luego los sustituimos con sed
+        cat > job.json <<'JSON'
+        {
+          "name": "WF_ProyectoFinal",
+          "max_concurrent_runs": 1,
+          "tasks": [
+            {
+              "task_key": "drop_medallion",
+              "notebook_task": {
+                "notebook_path": "__DEST_BASE__/drop_medallion"
+              },
+              "existing_cluster_id": "__CLUSTER_ID__",
+              "timeout_seconds": 3600
+            },
+            {
+              "task_key": "00_prep_env",
+              "depends_on": [{ "task_key": "drop_medallion" }],
+              "notebook_task": {
+                "notebook_path": "__DEST_BASE__/00_prep_env"
+              },
+              "existing_cluster_id": "__CLUSTER_ID__",
+              "timeout_seconds": 3600
+            },
+            {
+              "task_key": "01_ingest",
+              "depends_on": [{ "task_key": "00_prep_env" }],
+              "notebook_task": {
+                "notebook_path": "__DEST_BASE__/01_ingest"
+              },
+              "existing_cluster_id": "__CLUSTER_ID__",
+              "timeout_seconds": 3600
+            },
+            {
+              "task_key": "02_transform",
+              "depends_on": [{ "task_key": "01_ingest" }],
+              "notebook_task": {
+                "notebook_path": "__DEST_BASE__/02_transform"
+              },
+              "existing_cluster_id": "__CLUSTER_ID__",
+              "timeout_seconds": 3600
+            },
+            {
+              "task_key": "03_load",
+              "depends_on": [{ "task_key": "02_transform" }],
+              "notebook_task": {
+                "notebook_path": "__DEST_BASE__/03_load"
+              },
+              "existing_cluster_id": "__CLUSTER_ID__",
+              "timeout_seconds": 3600
+            }
+          ]
+        }
+        JSON
+        # 2) Sustituir placeholders
+        sed -i "s#__DEST_BASE__#${DEST_BASE}#g" job.json
+        sed -i "s/__CLUSTER_ID__/${CLUSTER_ID}/g" job.json
 
-      # 🔐 Unificamos credenciales DEST y respetamos tus variables existentes
-      - name: Exportar variables DEST al entorno
-        shell: bash
-        run: |
-          set -euo pipefail
-          # DEST: preferimos variables ya definidas; si no, caemos a secrets/vars
-          HOST="${DEST_HOST:-${{ secrets.DEST_HOST }}}"
-          [[ -z "$HOST" ]] && HOST="${{ secrets.DATABRICKS_DEST_HOST }}"
-          TOKEN="${DEST_TOKEN:-${{ secrets.DEST_TOKEN }}}"
-          [[ -z "$TOKEN" ]] && TOKEN="${{ secrets.DATABRICKS_DEST_TOKEN }}"
-          CLUSTER="${DEST_CLUSTER_ID:-${{ vars.DEST_CLUSTER_ID }}}"
-          BASE="${WORKSPACE_BASE:-${{ vars.WORKSPACE_BASE }}}"
+        # 3) Validar JSON antes de llamar al API (evita MALFORMED_REQUEST)
+        jq . job.json
 
-          if [[ -z "$HOST" ]]; then echo "❌ Falta DEST_HOST (o secret DEST_HOST / DATABRICKS_DEST_HOST)"; exit 1; fi
-          if [[ -z "$TOKEN" ]]; then echo "❌ Falta DEST_TOKEN (o secret DEST_TOKEN / DATABRICKS_DEST_TOKEN)"; exit 1; fi
-          if [[ -z "$CLUSTER" ]]; then echo "❌ Falta DEST_CLUSTER_ID (o var DEST_CLUSTER_ID)"; exit 1; fi
-          if [[ -z "$BASE" ]]; then echo "❌ Falta WORKSPACE_BASE (o var WORKSPACE_BASE)"; exit 1; fi
+        # 4) Crear o actualizar el job
+        create_response=$(curl -s -X POST \
+          -H "Authorization: Bearer $DEST_TOKEN" \
+          -H "Content-Type: application/json" \
+          --data-binary @job.json \
+          "$DEST_HOST/api/2.1/jobs/create")
 
-          echo "DEST_HOST=$HOST" >> $GITHUB_ENV
-          echo "DEST_CLUSTER_ID=$CLUSTER" >> $GITHUB_ENV
-          echo "WORKSPACE_BASE=$BASE" >> $GITHUB_ENV
-
-          # El CLI usa estos dos nombres:
-          echo "DATABRICKS_HOST=$HOST" >> $GITHUB_ENV
-          echo "::add-mask::$TOKEN"
-          echo "DATABRICKS_TOKEN=$TOKEN" >> $GITHUB_ENV
-
-          echo "🚩 DEST_HOST=$HOST"
-          echo "🚩 DEST_CLUSTER_ID=$CLUSTER"
-          echo "🚩 WORKSPACE_BASE=$BASE"
-
-      - name: Mostrar tareas del workflow
-        shell: bash
-        run: |
-          echo "🚀 Workflow: Proyecto Final"
-          echo "  1) 🧹  drop_medallion"
-          echo "  2) 🧰  00_prep_env"
-          echo "  3) 🛢️⬇️ 01_ingest"
-          echo "  4) 🔄  02_transform"
-          echo "  5) 🛢️⬆️ 03_load"
-
-      # ⬇️ Export desde ORIGIN si hay secrets de origen (se omite si no existen)
-      - name: Export multiple notebooks (raw) desde ORIGIN (opcional)
-        shell: bash
-        run: |
-          set -euo pipefail
-          ORIGIN_HOST='${{ secrets.DATABRICKS_ORIGIN_HOST }}'
-          ORIGIN_TOKEN='${{ secrets.DATABRICKS_ORIGIN_TOKEN }}'
-          # Usa ORIGIN_WORKSPACE_BASE si existe, sino el mismo WORKSPACE_BASE
-          ORIGIN_BASE='${{ vars.ORIGIN_WORKSPACE_BASE }}'
-          if [[ -z "$ORIGIN_BASE" || "$ORIGIN_BASE" == "null" ]]; then ORIGIN_BASE="${WORKSPACE_BASE}"; fi
-
-          if [[ -z "$ORIGIN_HOST" || -z "$ORIGIN_TOKEN" ]]; then
-            echo "ℹ️ No hay credenciales de ORIGIN: se omite export."
+        # Si ya existe, reset en vez de create
+        if echo "$create_response" | jq -e '.error_code=="RESOURCE_ALREADY_EXISTS"' >/dev/null 2>&1; then
+          echo "Job ya existe; aplicando reset"
+          # Obtener job_id por nombre
+          job_id=$(curl -s -X GET \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            "$DEST_HOST/api/2.1/jobs/list" | jq -r '.jobs[] | select(.settings.name=="WF_ProyectoFinal") | .job_id')
+          curl -s -X POST \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @job.json \
+            "$DEST_HOST/api/2.1/jobs/reset?job_id=${job_id}" >/dev/null
+          echo "Reset aplicado al job ${job_id}"
+        else
+          echo "Workflow creation response: $create_response"
+          if echo "$create_response" | jq -e '.job_id' >/dev/null 2>&1; then
+            echo "Workflow creado correctamente"
           else
-            echo "📤 Exportando desde ORIGIN: ${ORIGIN_BASE} → ./exported"
-            mkdir -p exported
-            DATABRICKS_HOST="$ORIGIN_HOST" DATABRICKS_TOKEN="$ORIGIN_TOKEN" \
-              databricks workspace export-dir "$ORIGIN_BASE" ./exported --overwrite
+            echo "❌ Error al crear el workflow"
+            echo "Response completo: $create_response"
+            exit 1
           fi
-
-      # ⬇️ Import a DEST: si hay ./exported, lo sube; si no, continúa (asumes ya están en el workspace)
-      - name: Deploy notebooks to Destination Workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -d "./exported" ]]; then
-            echo "📥 Importando a DEST: ./exported → ${WORKSPACE_BASE}"
-            databricks workspace import-dir ./exported "${WORKSPACE_BASE}" --overwrite
-          else
-            echo "ℹ️ No existe ./exported; se asume que los notebooks ya están en ${WORKSPACE_BASE}."
-          fi
-
-      - name: Render job.json
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > job.json <<'JSON'
-          {
-            "name": "WF_ProyectoFinal",
-            "max_concurrent_runs": 1,
-            "tasks": [
-              {
-                "task_key": "drop_medallion",
-                "notebook_task": { "notebook_path": "__WORKSPACE_BASE__/drop_medallion" },
-                "existing_cluster_id": "__CLUSTER_ID__",
-                "timeout_seconds": 3600
-              },
-              {
-                "task_key": "00_prep_env",
-                "depends_on": [{ "task_key": "drop_medallion" }],
-                "notebook_task": { "notebook_path": "__WORKSPACE_BASE__/00_prep_env" },
-                "existing_cluster_id": "__CLUSTER_ID__",
-                "timeout_seconds": 3600
-              },
-              {
-                "task_key": "01_ingest",
-                "depends_on": [{ "task_key": "00_prep_env" }],
-                "notebook_task": { "notebook_path": "__WORKSPACE_BASE__/01_ingest.py" },
-                "existing_cluster_id": "__CLUSTER_ID__",
-                "timeout_seconds": 3600
-              },
-              {
-                "task_key": "02_transform",
-                "depends_on": [{ "task_key": "01_ingest" }],
-                "notebook_task": { "notebook_path": "__WORKSPACE_BASE__/02_transform.py" },
-                "existing_cluster_id": "__CLUSTER_ID__",
-                "timeout_seconds": 3600
-              },
-              {
-                "task_key": "03_load",
-                "depends_on": [{ "task_key": "02_transform" }],
-                "notebook_task": { "notebook_path": "__WORKSPACE_BASE__/03_load" },
-                "existing_cluster_id": "__CLUSTER_ID__",
-                "timeout_seconds": 3600
-              }
-            ]
-          }
-          JSON
-
-          sed -i "s#__WORKSPACE_BASE__#${WORKSPACE_BASE}#g" job.json
-          sed -i "s/__CLUSTER_ID__/${DEST_CLUSTER_ID}/g" job.json
-          jq . job.json
-
-      - name: Upsert del job (create o reset)
-        shell: bash
-        run: |
-          set -euo pipefail
-          JOB_ID=$(databricks jobs list --output JSON | jq -r '.jobs[] | select(.settings.name=="WF_ProyectoFinal") | .job_id' || true)
-          if [ -n "${JOB_ID}" ]; then
-            echo "Job existente: ${JOB_ID} → reset con nueva configuración"
-            databricks jobs reset --job-id "${JOB_ID}" --json-file job.json
-          else
-            echo "Creando nuevo job WF_ProyectoFinal"
-            CREATE_OUT=$(databricks jobs create --json-file job.json)
-            JOB_ID=$(echo "$CREATE_OUT" | jq -r '.job_id')
-            if [ -z "${JOB_ID}" ] || [ "${JOB_ID}" = "null" ]; then
-              echo "❌ No se obtuvo job_id al crear el job"; echo "$CREATE_OUT"; exit 1
-            fi
-          fi
-          echo "JOB_ID=${JOB_ID}" >> $GITHUB_ENV
-          echo "✅ Job listo con ID: ${JOB_ID}"
-
-      # 🔎 Validación robusta: separa código HTTP y body, y valida JSON (anti exit code 3)
-      - name: Validar workflow y evitar exit code 3 de jq
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-
-          call_api () {
-            local method="$1"
-            local url="$2"
-            local body="${3:-}"
-
-            if [[ -n "$body" ]]; then
-              resp=$(curl -sS -X "$method" "$url" \
-                -H "Authorization: Bearer $DATABRICKS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d "$body" -w '\n%{http_code}')
-            else
-              resp=$(curl -sS -X "$method" "$url" \
-                -H "Authorization: Bearer $DATABRICKS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -w '\n%{http_code}')
-            fi
-
-            code=$(echo "$resp" | tail -n1)
-            body=$(echo "$resp" | sed '$d')
-
-            if [[ ! "$code" =~ ^2 ]]; then
-              echo "❌ HTTP $code en $url"
-              echo "—— Respuesta cruda ——"
-              echo "$body"
-              exit 1
-            fi
-
-            if ! echo "$body" | jq -e . >/dev/null 2>&1; then
-              echo "❌ La respuesta no es JSON válido para $url"
-              echo "—— Respuesta cruda ——"
-              echo "$body"
-              exit 1
-            fi
-
-            echo "$body"
-          }
-
-          echo "🔍 Validando la configuración del workflow creado..."
-          WF=$(call_api GET "$DATABRICKS_HOST/api/2.1/jobs/get?job_id=${JOB_ID}")
-          echo "✅ Workflow encontrado con ID: $(echo "$WF" | jq -r '.job_id')"
-          echo "🧩 Nombre: $(echo "$WF" | jq -r '.settings.name')"
-          echo "📦 Tareas:"
-          echo "$WF" | jq -r '.settings.tasks[] | "- \(.task_key) -> \(.notebook_task.notebook_path)"'
-
-      - name: Ejecutar workflow (opcional) y esperar a que termine
-        if: ${{ inputs.run_now }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "⏩ Lanzando ejecución para JOB_ID=${JOB_ID}"
-          RUN_OUT=$(databricks jobs run-now --job-id "${JOB_ID}")
-          echo "$RUN_OUT" | jq .
-          RUN_ID=$(echo "$RUN_OUT" | jq -r '.run_id')
-          if [ -z "${RUN_ID}" ] || [ "${RUN_ID}" = "null" ]; then
-            echo "❌ No se obtuvo run_id al ejecutar el job"; exit 1
-          fi
-          echo "RUN_ID=${RUN_ID}" >> $GITHUB_ENV
-
-          echo "⏳ Esperando a que termine la ejecución…"
-          databricks runs wait --run-id "${RUN_ID}" --timeout 7200
-          echo "✅ Ejecución completada."
-          echo "🧭 Workflow ejecutado automáticamente"
+        fi  
+    - name: Validate Workflow Configuration
+      run: |
+        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
+        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+        WORKFLOW_NAME="WF_ProyectoFinal"
+        
+        echo "🔍 Validando la configuración del workflow creado..."
+        
+        # Obtener lista de workflows y encontrar el recién creado
+        workflows_list=$(curl -s -X GET \
+          -H "Authorization: Bearer $DEST_TOKEN" \
+          "$DEST_HOST/api/2.1/jobs/list")
+        
+        job_id=$(echo "$workflows_list" | jq -r --arg name "$WORKFLOW_NAME" '.jobs[]? | select(.settings.name == $name) | .job_id')
+        
+        if [ "$job_id" != "" ] && [ "$job_id" != "null" ]; then
+          echo "✅ Workflow encontrado con ID: $job_id"
+          
+          # Obtener configuración detallada
+          job_details=$(curl -s -X GET \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            "$DEST_HOST/api/2.1/jobs/get?job_id=$job_id")
+          
+          echo "📋 Resumen del workflow:"
+          echo "Nombre: $(echo "$job_details" | jq -r '.settings.name')"
+          echo "Número de tareas: $(echo "$job_details" | jq '.settings.tasks | length')"
           echo ""
-          echo "🔗 Accede a tu workspace de Databricks para ver los resultados detallados:"
-          echo "   ${DATABRICKS_HOST}/#job/${JOB_ID}/run/${RUN_ID}"
-
-      - name: Resumen con iconos
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          cat << EOF >> $GITHUB_STEP_SUMMARY
-          ## 🧭 Pipeline — Proyecto Final
-          1. 🧹 **drop_medallion**
-          2. 🧰 **00_prep_env**
-          3. 🛢️⬇️ **01_ingest**
-          4. 🔄 **02_transform**
-          5. 🛢️⬆️ **03_load**
-
-          ---
-          ### 🧭 Workflow ejecutado automáticamente
-          🔗 Accede a tu workspace de Databricks para ver los resultados detallados:  
-          ${DATABRICKS_HOST}/#job/${JOB_ID}/run/${RUN_ID}
-          EOF
+          echo "📝 Tareas configuradas:"
+          echo "$job_details" | jq -r '.settings.tasks[] | "- " + .task_key + " → " + .notebook_task.notebook_path'
+          echo ""
+          echo "🖥️  Cluster configurado:"
+          echo "Cluster ID: $(echo "$job_details" | jq -r '.settings.tasks[0].existing_cluster_id')"
+          echo "Cluster Name: cluster_SD (reutilizado)"
+          
+        else
+          echo "❌ No se pudo encontrar el workflow creado"
+          exit 1
+        fi
+    
+    - name: Execute Workflow WF_ProyectoFinal
+      run: |
+        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
+        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+        WORKFLOW_NAME="WF_ProyectoFinal"
+        
+        echo "🚀 Ejecutando workflow: $WORKFLOW_NAME"
+        
+        # Obtener job_id del workflow
+        workflows_list=$(curl -s -X GET \
+          -H "Authorization: Bearer $DEST_TOKEN" \
+          "$DEST_HOST/api/2.1/jobs/list")
+        
+        job_id=$(echo "$workflows_list" | jq -r --arg name "$WORKFLOW_NAME" '.jobs[]? | select(.settings.name == $name) | .job_id')
+        
+        if [ "$job_id" != "" ] && [ "$job_id" != "null" ]; then
+          echo "✅ Workflow WF_ProyectoFinal encontrado con ID: $job_id"
+          
+          # Ejecutar el workflow
+          run_response=$(curl -s -X POST \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"job_id\": $job_id}" \
+            "$DEST_HOST/api/2.1/jobs/run-now")
+          
+          run_id=$(echo "$run_response" | jq -r '.run_id')
+          
+          if [ "$run_id" != "" ] && [ "$run_id" != "null" ]; then
+            echo "🎯 Workflow ejecutado exitosamente!"
+            echo "Run ID: $run_id"
+            echo "WORKFLOW_RUN_ID=$run_id" >> $GITHUB_ENV
+            echo "WORKFLOW_JOB_ID=$job_id" >> $GITHUB_ENV
+            
+            # Mostrar URL del workflow en ejecución
+            echo "🔗 URL del workflow: $DEST_HOST/jobs/$job_id/runs/$run_id"
+            
+          else
+            echo "❌ Error al ejecutar el workflow"
+            echo "Response: $run_response"
+            exit 1
+          fi
+        else
+          echo "❌ No se pudo encontrar el workflow para ejecutar"
+          exit 1
+        fi
+    
+    - name: Monitor Workflow Execution
+      run: |
+        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
+        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+        RUN_ID="${{ env.WORKFLOW_RUN_ID }}"
+        JOB_ID="${{ env.WORKFLOW_JOB_ID }}"
+        
+        echo "📊 Monitoreando ejecución del workflow WF_ProyectoFinal..."
+        echo "Job ID: $JOB_ID"
+        echo "Run ID: $RUN_ID"
+        
+        # Monitorear por máximo 10 minutos (600 segundos)
+        max_wait_time=600
+        wait_time=0
+        check_interval=30
+        
+        while [ $wait_time -lt $max_wait_time ]; do
+          # Obtener estado actual
+          run_status=$(curl -s -X GET \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            "$DEST_HOST/api/2.1/jobs/runs/get?run_id=$RUN_ID")
+          
+          state=$(echo "$run_status" | jq -r '.state.life_cycle_state')
+          result_state=$(echo "$run_status" | jq -r '.state.result_state // "RUNNING"')
+          
+          echo "⏱️  Estado actual: $state ($result_state) - Tiempo transcurrido: ${wait_time}s"
+          
+          # Mostrar progreso de las tareas
+          echo "$run_status" | jq -r '.tasks[]? | "  📋 " + .task_key + ": " + .state.life_cycle_state + " (" + (.state.result_state // "RUNNING") + ")"'
+          
+          case "$state" in
+            "TERMINATED")
+              if [ "$result_state" = "SUCCESS" ]; then
+                echo "🎉 ¡Workflow WF_ProyectoFinal completado exitosamente!"
+                
+                # Mostrar resumen final
+                echo ""
+                echo "📈 Resumen de ejecución:"
+                echo "$run_status" | jq -r '.tasks[]? | "✅ " + .task_key + " → " + (.state.result_state // "SUCCESS")'
+                
+                # Obtener duración
+                start_time=$(echo "$run_status" | jq -r '.start_time')
+                end_time=$(echo "$run_status" | jq -r '.end_time')
+                if [ "$start_time" != "null" ] && [ "$end_time" != "null" ]; then
+                  duration=$((($end_time - $start_time) / 1000))
+                  echo "⏰ Duración total: ${duration} segundos"
+                fi
+                
+                exit 0
+              else
+                echo "❌ Workflow terminó con errores: $result_state"
+                echo "📋 Detalles de las tareas:"
+                echo "$run_status" | jq -r '.tasks[]? | "❌ " + .task_key + ": " + (.state.result_state // "UNKNOWN")'
+                exit 1
+              fi
+              ;;
+            "INTERNAL_ERROR"|"SKIPPED")
+              echo "❌ Workflow falló con estado: $state"
+              exit 1
+              ;;
+            *)
+              # Estados: PENDING, RUNNING, TERMINATING
+              echo "⏳ Workflow WF_ProyectoFinal aún ejecutándose..."
+              ;;
+          esac
+          
+          sleep $check_interval
+          wait_time=$((wait_time + check_interval))
+        done
+        
+        echo "⚠️  Timeout: El workflow aún se está ejecutando después de $max_wait_time segundos"
+        echo "🔗 Verifica el estado en: $DEST_HOST/jobs/$JOB_ID/runs/$RUN_ID"
+        echo "ℹ️  El workflow seguirá ejecutándose en Databricks"
+        exit 0
+    
+    - name: Clean up
+      run: |
+        rm -rf notebooks_to_deploy
+        rm -f workflow_config.json
+    
+    - name: Done
+      run: |
+        echo "🎉 ¡Despliegue y ejecución completados exitosamente!"
+        echo ""
+        echo "📊 Resumen:"
+        echo "✅ Notebooks desplegados: drop_medallion, 00_prep_env, 01_ingest, 02_transform, C"
+        echo "🚀 Workflow creado: WF_ProyectoFinal"
+        echo "✅ Tareas configuradas:"
+        echo "   - 🧹 Tarea1_notebook1 (drop_medallion)"
+        echo "   - 🧰 Tarea2_notebook2 (00_prep_env)"
+        echo "   - 🛢️⬇️ Tarea3_notebook2 (01_ingest)"
+        echo "   - 🔄 Tarea4_notebook2 (02_transform)"
+        echo "   - 🛢️⬆️Tarea5_notebook2 (03_load)"
+        echo "✅ Cluster existente: cluster_SD configurado"
+        echo "🧭 Workflow ejecutado automáticamente"
+        echo ""
+        echo "🔗 Accede a tu workspace de Databricks para ver los resultados detallados"
