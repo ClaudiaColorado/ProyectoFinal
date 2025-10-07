@@ -1,4 +1,4 @@
-name: Deploy Databricks Workflow (WF_ProyectoFinal)
+name: Deploy Databricks Workflow (WF_ProyectoFinalv1)
 
 on:
   workflow_dispatch:
