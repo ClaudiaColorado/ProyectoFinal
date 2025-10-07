@@ -210,41 +210,44 @@ jobs:
             echo "Response completo: $create_response"
             exit 1
           fi
-        fi  
-- name: "Validar workflow (anti-jq exit code 3)"
-  shell: bash
-  run: |
-    set -euo pipefail
+        fi
+    - name: "Validar workflow (anti-jq exit code 3)"
+      shell: bash
+      run: |
+          set -euo pipefail
 
-    get_json() {
-      local url="$1"
-      local resp code body
-      resp=$(curl -sS -H "Authorization: Bearer ${DEST_TOKEN}"                      -H "Content-Type: application/json"                      "$url" -w $'\n%{http_code}')
-      code=$(echo "$resp" | tail -n1)
-      body=$(echo "$resp" | sed '$d')
+          get_json() {
+            local url="$1"
+            local resp code body
+            resp=$(curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
+                           -H "Content-Type: application/json" \
+                           "$url" -w $'\n%{http_code}')
+            code=$(echo "$resp" | tail -n1)
+            body=$(echo "$resp" | sed '$d')
 
-      if [[ ! "$code" =~ ^2 ]]; then
-        echo "HTTP $code in $url"
-        echo "BODY (raw):"
-        echo "$body"
-        exit 1
-      fi
-      if ! echo "$body" | jq -e . >/dev/null 2>&1; then
-        echo "Body is not valid JSON for $url"
-        echo "BODY (raw):"
-        echo "$body"
-        exit 1
-      fi
-      printf '%s' "$body"
-    }
+            if [[ ! "$code" =~ ^2 ]]; then
+              echo "HTTP $code in $url"
+              echo "BODY (raw):"
+              echo "$body"
+              exit 1
+            fi
+            if ! echo "$body" | jq -e . >/dev/null 2>&1; then
+              echo "Body is not valid JSON for $url"
+              echo "BODY (raw):"
+              echo "$body"
+              exit 1
+            fi
+            printf '%s' "$body"
+          }
 
-    echo "Validating workflow configuration..."
-    WF_JSON=$(get_json "${DEST_HOST}/api/2.1/jobs/get?job_id=${WORKFLOW_ID}")
+          echo "Validating workflow configuration..."
+          WF_JSON=$(get_json "${DEST_HOST}/api/2.1/jobs/get?job_id=${WORKFLOW_ID}")
 
-    echo "Workflow found: $(echo "$WF_JSON" | jq -r '.job_id')"
-    echo "Name: $(echo "$WF_JSON" | jq -r '.settings.name')"
-    echo "Tasks:"
-    echo "$WF_JSON" | jq -r '.settings.tasks[] | "- \(.task_key) -> \(.notebook_task.notebook_path)"'
+          echo "Workflow found: $(echo "$WF_JSON" | jq -r '.job_id')"
+          echo "Name: $(echo "$WF_JSON" | jq -r '.settings.name')"
+          echo "Tasks:"
+          echo "$WF_JSON" | jq -r '.settings.tasks[] | "- \(.task_key) -> \(.notebook_task.notebook_path)"'
+     
     - name: Execute Workflow WF_ProyectoFinal
       run: |
         DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
