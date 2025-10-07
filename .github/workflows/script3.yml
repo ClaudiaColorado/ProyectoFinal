@@ -1,4 +1,4 @@
-name: Dynamic Databricks Proyecto Final Deploy v1
+name: Dynamic Databricks Proyecto Final Deploy v2
 on:
   push:
     branches:
@@ -382,13 +382,13 @@ jobs:
         echo ""
         echo "📊 Resumen:"
         echo "✅ Notebooks desplegados: drop_medallion, 00_prep_env, 01_ingest, 02_transform, C"
-        echo "✅ Workflow creado: WF_ProyectoFinal"
+        echo "🚀 Workflow creado: WF_ProyectoFinal"
         echo "✅ Tareas configuradas:"
-        echo "   - tarea1_notebook1 (drop_medallion)"
-        echo "   - tarea2_notebook2 (00_prep_env)"
-        echo "   - tarea3_notebook2 (01_ingest)"
-        echo "   - tarea4_notebook2 (02_transform)"
-        echo "   - tarea5_notebook2 (03_load)"
+        echo "   - 🧹 Tarea1_notebook1 (drop_medallion)"
+        echo "   - 🧰 Tarea2_notebook2 (00_prep_env)"
+        echo "   - 📥Tarea3_notebook2 (01_ingest)"
+        echo "   - 🔄 Tarea4_notebook2 (02_transform)"
+        echo "   - 📤Tarea5_notebook2 (03_load)"
         echo "✅ Cluster existente: cluster_SD configurado"
         echo "🚀 Workflow ejecutado automáticamente"
         echo ""
