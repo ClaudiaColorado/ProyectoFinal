@@ -219,8 +219,8 @@ jobs:
           # Si en pasos previos hiciste: echo "WORKFLOW_ID=..." >> $GITHUB_ENV
           # entonces aquí lo recuperamos. Si no existe, más abajo hacemos fallback por nombre.
           WORKFLOW_ID: ${{ env.WORKFLOW_ID }}
-        shell: bash
-        run: |
+      shell: bash
+      run: |
           set -euo pipefail
 
           # Usar variables locales seguras (y permitir fallback a DATABRICKS_* si existieran)
