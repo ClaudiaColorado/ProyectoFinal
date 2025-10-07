@@ -274,50 +274,58 @@ jobs:
           echo "$WF_JSON" | jq -r '.settings.tasks[] | "- \(.task_key) -> \(.notebook_task.notebook_path)"'
     
     - name: Execute Workflow WF_ProyectoFinal
+      env:
+        DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
+        DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
+      shell: bash
       run: |
-        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
-        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+        set -euo pipefail
         WORKFLOW_NAME="WF_ProyectoFinal"
-        
         echo "🚀 Ejecutando workflow: $WORKFLOW_NAME"
-        
-        # Obtener job_id del workflow
-        workflows_list=$(curl -s -X GET \
+
+        # 1) Resolver job_id por nombre
+        workflows_list=$(curl -sS \
           -H "Authorization: Bearer $DEST_TOKEN" \
+          -H "Content-Type: application/json" \
           "$DEST_HOST/api/2.1/jobs/list")
-        
-        job_id=$(echo "$workflows_list" | jq -r --arg name "$WORKFLOW_NAME" '.jobs[]? | select(.settings.name == $name) | .job_id')
-        
-        if [ "$job_id" != "" ] && [ "$job_id" != "null" ]; then
-          echo "✅ Workflow WF_ProyectoFinal encontrado con ID: $job_id"
-          
-          # Ejecutar el workflow
-          run_response=$(curl -s -X POST \
-            -H "Authorization: Bearer $DEST_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"job_id\": $job_id}" \
-            "$DEST_HOST/api/2.1/jobs/run-now")
-          
-          run_id=$(echo "$run_response" | jq -r '.run_id')
-          
-          if [ "$run_id" != "" ] && [ "$run_id" != "null" ]; then
-            echo "🎯 Workflow ejecutado exitosamente!"
-            echo "Run ID: $run_id"
-            echo "WORKFLOW_RUN_ID=$run_id" >> $GITHUB_ENV
-            echo "WORKFLOW_JOB_ID=$job_id" >> $GITHUB_ENV
-            
-            # Mostrar URL del workflow en ejecución
-            echo "🔗 URL del workflow: $DEST_HOST/jobs/$job_id/runs/$run_id"
-            
-          else
-            echo "❌ Error al ejecutar el workflow"
-            echo "Response: $run_response"
-            exit 1
-          fi
-        else
-          echo "❌ No se pudo encontrar el workflow para ejecutar"
+
+        job_id=$(echo "$workflows_list" \
+          | jq -r --arg name "$WORKFLOW_NAME" '.jobs[]? | select(.settings.name==$name) | .job_id' \
+          | head -n1)
+
+        if [[ -z "${job_id:-}" || "$job_id" == "null" ]]; then
+          echo "❌ No se pudo encontrar el workflow '$WORKFLOW_NAME'"; exit 1
+        fi
+        echo "✅ Workflow $WORKFLOW_NAME encontrado con ID: $job_id"
+
+        # 2) Ejecutar run-now con JSON correcto: {"job_id": <numero>}
+        payload=$(jq -n --arg id "$job_id" '{job_id: ($id|tonumber)}')
+
+        resp=$(curl -sS -X POST "$DEST_HOST/api/2.1/jobs/run-now" \
+          -H "Authorization: Bearer $DEST_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$payload" -w $'\n%{http_code}')
+        code=$(echo "$resp" | tail -n1)
+        body=$(echo "$resp" | sed '$d')
+
+        if [[ ! "$code" =~ ^2 ]]; then
+          echo "❌ Error al ejecutar el workflow (HTTP $code)"
+          echo "Response: $body"
           exit 1
         fi
+
+        run_id=$(echo "$body" | jq -r '.run_id')
+        if [[ -z "${run_id:-}" || "$run_id" == "null" ]]; then
+          echo "❌ No se obtuvo run_id"; echo "$body"; exit 1
+        fi
+
+        echo "🎯 Workflow ejecutado exitosamente!"
+        echo "Run ID: $run_id"
+        echo "WORKFLOW_RUN_ID=$run_id" >> $GITHUB_ENV
+        echo "WORKFLOW_JOB_ID=$job_id" >> $GITHUB_ENV
+
+        # 3) URL correcta del run en el UI
+        echo "🔗 URL del workflow: ${DEST_HOST}/#job/${job_id}/run/${run_id}"
     
     - name: Monitor Workflow Execution
       run: |
