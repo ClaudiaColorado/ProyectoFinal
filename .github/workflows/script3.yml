@@ -139,7 +139,7 @@ jobs:
         fi
     
     - name: Create Databricks Workflow WF_ProyectoFinal
-    run: |
+      run: |
       set -euo pipefail
       DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
       DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
@@ -148,8 +148,8 @@ jobs:
 
       echo "Creando workflow: WF_ProyectoFinal con cluster existente ID: $CLUSTER_ID"
 
-     cat > job.json <<'JSON'
-     {
+      cat > job.json <<'JSON'
+      {
        "name": "WF_ProyectoFinal",
        "max_concurrent_runs": 1,
        "tasks": [
@@ -157,20 +157,20 @@ jobs:
            "task_key": "drop_medallion",
            "source": "WORKSPACE",
            "notebook_task": {
-            "notebook_path": "__DEST_BASE__/drop_medallion"
-         },
-         "existing_cluster_id": "__CLUSTER_ID__",
-         "timeout_seconds": 3600
-        },
+             "notebook_path": "__DEST_BASE__/drop_medallion"
+            },
+            "existing_cluster_id": "__CLUSTER_ID__",
+            "timeout_seconds": 3600
+          },
         {
           "task_key": "00_prep_env",
           "depends_on": [{ "task_key": "drop_medallion" }],
           "source": "WORKSPACE",
           "notebook_task": {
             "notebook_path": "__DEST_BASE__/00_prep_env"
-        },
-        "existing_cluster_id": "__CLUSTER_ID__",
-        "timeout_seconds": 3600
+          },
+          "existing_cluster_id": "__CLUSTER_ID__",
+          "timeout_seconds": 3600
         },
         {
           "task_key": "01_ingest",
@@ -178,19 +178,19 @@ jobs:
           "source": "WORKSPACE",
           "notebook_task": {
             "notebook_path": "__DEST_BASE__/01_ingest"
-        },
-          "existing_cluster_id": "__CLUSTER_ID__",
-          "timeout_seconds": 3600
+          },
+           "existing_cluster_id": "__CLUSTER_ID__",
+           "timeout_seconds": 3600
         },
         {
           "task_key": "02_transform",
           "depends_on": [{ "task_key": "01_ingest" }],
           "source": "WORKSPACE",
           "notebook_task": {
-            "notebook_path": "__DEST_BASE__/02_transform"
-          },
-          "existing_cluster_id": "__CLUSTER_ID__",
-          "timeout_seconds": 3600
+             "notebook_path": "__DEST_BASE__/02_transform"
+            },
+           "existing_cluster_id": "__CLUSTER_ID__",
+           "timeout_seconds": 3600
         },
         {
           "task_key": "03_load",
