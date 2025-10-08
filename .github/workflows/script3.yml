@@ -139,7 +139,7 @@ jobs:
       run: |
         DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
         DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
-        DEST_BASE="/py/scripts/main"
+        DEST_BASE="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
         CLUSTER_ID="${{ env.CLUSTER_ID }}"
 
         echo "Creando workflow: WF_ProyectoFinal con cluster existente ID: $CLUSTER_ID"
@@ -240,8 +240,6 @@ jobs:
       env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
           DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-          # Si en pasos previos hiciste: echo "WORKFLOW_ID=..." >> $GITHUB_ENV
-          # entonces aquí lo recuperamos. Si no existe, más abajo hacemos fallback por nombre.
           WORKFLOW_ID: ${{ env.WORKFLOW_ID }}
       shell: bash
       run: |
