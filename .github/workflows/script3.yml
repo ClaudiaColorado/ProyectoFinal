@@ -18,7 +18,7 @@ jobs:
         run: |
           ORIGIN_HOST=${{ secrets.DATABRICKS_ORIGIN_HOST }}
           ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
-          NOTEBOOK_BASE="/workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
+          NOTEBOOK_BASE="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
           NOTEBOOKS=("drop_medallion" "00_prep_env" "01_ingest" "02_transform" "03_load")
           mkdir -p notebooks_to_deploy
           for nb in "${NOTEBOOKS[@]}"; do
@@ -46,7 +46,7 @@ jobs:
               -H "Authorization: Bearer $DEST_TOKEN" \
               -H "Content-Type: application/json" \
               -d "{\"path\":\"$DEST_BASE\"}" \
-              "$DEST_HOST/api/2.0/workspace/mkdirs"
+              "$DEST_HOST/api/2.0/Workspace/mkdirs"
             echo "Importando $file → $dest_path"
             response=$(curl -s -X POST \
               -H "Authorization: Bearer $DEST_TOKEN" \
@@ -56,7 +56,7 @@ jobs:
               -F "language=PYTHON" \
               -F "overwrite=true" \
               -F "content=@$file" \
-              "$DEST_HOST/api/2.0/workspace/import")
+              "$DEST_HOST/api/2.0/Workspace/import")
             echo "Response: $response"
           done
 
