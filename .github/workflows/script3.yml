@@ -124,122 +124,103 @@ jobs:
             exit 1
           fi
 
-      - name: Create/Update Databricks Workflow WF_ProyectoFinal (idempotente)
-        shell: bash
-        env:
-          DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
-          DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-          DEST_BASE: ${{ env.DEST_NOTEBOOK_BASE }}   # ej: /Workspace/Users/.../ProyectoFinal/1_Proceso
-          CLUSTER_ID: ${{ env.CLUSTER_ID }}
-        run: |
-          set -euo pipefail
-          echo "Creando/actualizando workflow: WF_ProyectoFinal con cluster ID: ${CLUSTER_ID}"
-          echo "DEST_BASE = ${DEST_BASE}"
-          # 1) Construir settings.json (config del job)
-          jq -n \
-            --arg base "$DEST_BASE" \
-            --arg cid  "$CLUSTER_ID" \
-            '{
-              name: "WF_ProyectoFinal",
-              max_concurrent_runs: 1,
-              tasks: [
-                {
-                  task_key: "drop_medallion",
-                  source: "WORKSPACE",
-                  notebook_task: { notebook_path: ($base + "/drop_medallion") },
-                  existing_cluster_id: $cid,
-                  timeout_seconds: 3600
-                },
-                {
-                  task_key: "00_prep_env",
-                  depends_on: [ { task_key: "drop_medallion" } ],
-                  source: "WORKSPACE",
-                  notebook_task: { notebook_path: ($base + "/00_prep_env") },
-                  existing_cluster_id: $cid,
-                  timeout_seconds: 3600
-                },
-                {
-                  task_key: "01_ingest",
-                  depends_on: [ { task_key: "00_prep_env" } ],
-                  source: "WORKSPACE",
-                  notebook_task: { notebook_path: ($base + "/01_ingest") },
-                  existing_cluster_id: $cid,
-                  timeout_seconds: 3600
-                },
-                {
-                  task_key: "02_transform",
-                  depends_on: [ { task_key: "01_ingest" } ],
-                  source: "WORKSPACE",
-                  notebook_task: { notebook_path: ($base + "/02_transform") },
-                  existing_cluster_id: $cid,
-                  timeout_seconds: 3600
-                },
-                {
-                  task_key: "03_load",
-                  depends_on: [ { task_key: "02_transform" } ],
-                  source: "WORKSPACE",
-                  notebook_task: { notebook_path: ($base + "/03_load") },
-                  existing_cluster_id: $cid,
-                  timeout_seconds: 3600
-                }
-              ]
-            }' > settings.json
+    - name: Recreate Databricks Workflow WF_ProyectoFinal (force clean)
+    shell: bash
+    env:
+    DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
+    DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
+    DEST_BASE: ${{ env.DEST_NOTEBOOK_BASE }}   # define esto igual que en deploy/verify
+    CLUSTER_ID: ${{ env.CLUSTER_ID }}
+  run: |
+    set -euo pipefail
+    echo "Recreando workflow WF_ProyectoFinal con cluster ${CLUSTER_ID}"
+    echo "DEST_BASE = ${DEST_BASE}"
 
-          echo "Settings a aplicar:"
-          jq . settings.json
+    # 0) Si existe un job con ese nombre, eliminarlo (evita heredar config antigua tipo spark_python_task)
+    existing_id=$(curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
+      "${DEST_HOST}/api/2.1/jobs/list" | jq -r \
+      '.jobs[]? | select(.settings.name=="WF_ProyectoFinal") | .job_id' | head -n1)
+    if [[ -n "${existing_id}" && "${existing_id}" != "null" ]]; then
+      echo "Borrando job existente: ${existing_id}"
+      curl -sS -X POST -H "Authorization: Bearer ${DEST_TOKEN}" \
+        -H "Content-Type: application/json" \
+        --data "{\"job_id\": ${existing_id}}" \
+        "${DEST_HOST}/api/2.1/jobs/delete" >/dev/null
+      echo "Job ${existing_id} eliminado"
+    fi
 
-          # 2) Buscar si ya existe un job con ese nombre
-          job_id=$(
-            curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
-              "${DEST_HOST}/api/2.1/jobs/list" \
-            | jq -r '.jobs[]? | select(.settings.name=="WF_ProyectoFinal") | .job_id' \
-            | head -n1
-          )
+    # 1) Construir settings.json sólo con notebook_task y rutas /Users/...
+    #    OJO: aquí usamos /Users/... (no /Workspace/Users/...) para notebook_path
+    jq -n \
+      --arg base_users "$(echo "${DEST_BASE}" | sed 's#^/Workspace##')" \
+      --arg cid  "$CLUSTER_ID" \
+      '{
+        name: "WF_ProyectoFinal",
+        max_concurrent_runs: 1,
+        tasks: [
+          {
+            task_key: "drop_medallion",
+            source: "WORKSPACE",
+            notebook_task: { notebook_path: ($base_users + "/drop_medallion") },
+            existing_cluster_id: $cid,
+            timeout_seconds: 3600
+          },
+          {
+            task_key: "00_prep_env",
+            depends_on: [ { task_key: "drop_medallion" } ],
+            source: "WORKSPACE",
+            notebook_task: { notebook_path: ($base_users + "/00_prep_env") },
+            existing_cluster_id: $cid,
+            timeout_seconds: 3600
+          },
+          {
+            task_key: "01_ingest",
+            depends_on: [ { task_key: "00_prep_env" } ],
+            source: "WORKSPACE",
+            notebook_task: { notebook_path: ($base_users + "/01_ingest") },
+            existing_cluster_id: $cid,
+            timeout_seconds: 3600
+          },
+          {
+            task_key: "02_transform",
+            depends_on: [ { task_key: "01_ingest" } ],
+            source: "WORKSPACE",
+            notebook_task: { notebook_path: ($base_users + "/02_transform") },
+            existing_cluster_id: $cid,
+            timeout_seconds: 3600
+          },
+          {
+            task_key: "03_load",
+            depends_on: [ { task_key: "02_transform" } ],
+            source: "WORKSPACE",
+            notebook_task: { notebook_path: ($base_users + "/03_load") },
+            existing_cluster_id: $cid,
+            timeout_seconds: 3600
+          }
+        ]
+      }' > settings.json
 
-          if [[ -n "${job_id}" && "${job_id}" != "null" ]]; then
-            echo "Job existente: ${job_id} -> reset con new_settings"
-            jq -n --arg job_id "${job_id}" --argjson settings "$(cat settings.json)" \
-              '{ job_id: ($job_id|tonumber), new_settings: $settings }' > reset.json
+    echo "Settings a crear:"; jq . settings.json
 
-            reset_resp=$(
-              curl -sS -X POST \
-                -H "Authorization: Bearer ${DEST_TOKEN}" \
-                -H "Content-Type: application/json" \
-                --data-binary @reset.json \
-                "${DEST_HOST}/api/2.1/jobs/reset"
-            )
-            echo "Reset response:"
-            echo "${reset_resp}" | jq .
+    # 2) Crear el job limpio
+    create_resp=$(curl -sS -X POST \
+      -H "Authorization: Bearer ${DEST_TOKEN}" \
+      -H "Content-Type: application/json" \
+      --data-binary @settings.json \
+      "${DEST_HOST}/api/2.1/jobs/create")
+    echo "Create response:"; echo "${create_resp}" | jq .
 
-            # Validar que no haya error
-            if echo "${reset_resp}" | jq -e '.error_code' >/dev/null 2>&1; then
-              echo "❌ Error al resetear el job"
-              exit 1
-            fi
-          else
-            echo "Job no existe -> creando"
-            create_resp=$(
-              curl -sS -X POST \
-                -H "Authorization: Bearer ${DEST_TOKEN}" \
-                -H "Content-Type: application/json" \
-                --data-binary @settings.json \
-                "${DEST_HOST}/api/2.1/jobs/create"
-            )
-            echo "Create response:"
-            echo "${create_resp}" | jq .
+    job_id=$(echo "${create_resp}" | jq -r '.job_id')
+    if [[ -z "${job_id}" || "${job_id}" == "null" ]]; then
+      echo "❌ Error al crear el job"; exit 1
+    fi
 
-            job_id=$(echo "${create_resp}" | jq -r '.job_id')
-            if [[ -z "${job_id}" || "${job_id}" == "null" ]]; then
-              echo "❌ Error al crear el job"
-              exit 1
-            fi
-          fi
+    # 3) Verificación: deben ser notebook_task y apuntar a /Users/...
+    echo "Verificando tareas del job ${job_id}..."
+    curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
+      "${DEST_HOST}/api/2.1/jobs/get?job_id=${job_id}" \
+      | jq '.settings.tasks[] | {task_key, source, notebook_path: (.notebook_task.notebook_path // null), spark_python_task: .spark_python_task // null}'
 
-          # 3) Verificación: que las tasks sean notebook_task y apunten a /Workspace/...
-          echo "Verificando tareas del job ${job_id}..."
-          curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
-            "${DEST_HOST}/api/2.1/jobs/get?job_id=${job_id}" \
-            | jq '.settings.tasks[] | {task_key, source, notebook_task, spark_python_task}'
 
       - name: Execute Workflow WF_ProyectoFinal
         env:
