@@ -157,51 +157,51 @@ jobs:
               "task_key": "drop_medallion",
               "source": "WORKSPACE",
                 "notebook_task": {
-              "notebook_path": "__DEST_BASE__/drop_medallion"
-              },
-              "existing_cluster_id": "__CLUSTER_ID__",
-              "timeout_seconds": 3600
-           },
-           {
-             "task_key": "00_prep_env",
-             "depends_on": [{ "task_key": "drop_medallion" }],
-             "source": "WORKSPACE",
-             "notebook_task": {
-               "notebook_path": "__DEST_BASE__/00_prep_env"
-              },
-              "existing_cluster_id": "__CLUSTER_ID__",
-              "timeout_seconds": 3600
-           },
-           {
-              "task_key": "01_ingest",
-              "depends_on": [{ "task_key": "00_prep_env" }],
+                  "notebook_path": "__DEST_BASE__/drop_medallion"
+                },
+                "existing_cluster_id": "__CLUSTER_ID__",
+                "timeout_seconds": 3600
+            },
+            {
+               "task_key": "00_prep_env",
+               "depends_on": [{ "task_key": "drop_medallion" }],
+               "source": "WORKSPACE",
+               "notebook_task": {
+                 "notebook_path": "__DEST_BASE__/00_prep_env"
+                },
+                "existing_cluster_id": "__CLUSTER_ID__",
+                "timeout_seconds": 3600
+            },
+            {
+               "task_key": "01_ingest",
+               "depends_on": [{ "task_key": "00_prep_env" }],
               "source": "WORKSPACE",
-              "notebook_task": {
-                "notebook_path": "__DEST_BASE__/01_ingest"
-             },
-             "existing_cluster_id": "__CLUSTER_ID__",
-             "timeout_seconds": 3600
-           },
-           {
-             "task_key": "02_transform",
-             "depends_on": [{ "task_key": "01_ingest" }],
-             "source": "WORKSPACE",
-             "notebook_task": {
-               "notebook_path": "__DEST_BASE__/02_transform"
-              },
-              "existing_cluster_id": "__CLUSTER_ID__",
-              "timeout_seconds": 3600
-           },
-           {
-              "task_key": "03_load",
-              "depends_on": [{ "task_key": "02_transform" }],
-              "source": "WORKSPACE",
-              "notebook_task": {
-                "notebook_path": "__DEST_BASE__/03_load"
-              },
-              "existing_cluster_id": "__CLUSTER_ID__",
-              "timeout_seconds": 3600
-           }
+               "notebook_task": {
+                 "notebook_path": "__DEST_BASE__/01_ingest"
+               },
+               "existing_cluster_id": "__CLUSTER_ID__",
+               "timeout_seconds": 3600
+            },
+            {
+               "task_key": "02_transform",
+               "depends_on": [{ "task_key": "01_ingest" }],
+               "source": "WORKSPACE",
+               "notebook_task": {
+                 "notebook_path": "__DEST_BASE__/02_transform"
+               },
+               "existing_cluster_id": "__CLUSTER_ID__",
+               "timeout_seconds": 3600
+            },
+            {
+               "task_key": "03_load",
+               "depends_on": [{ "task_key": "02_transform" }],
+               "source": "WORKSPACE",
+               "notebook_task": {
+                 "notebook_path": "__DEST_BASE__/03_load"
+                },
+                "existing_cluster_id": "__CLUSTER_ID__",
+                "timeout_seconds": 3600
+            }
       ]
     }
     JSON
