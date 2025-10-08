@@ -28,7 +28,7 @@ jobs:
             --output "notebooks_to_deploy/$nb.py"
         done
     - name: Set destination base once
-    run: |
+      run: |
       echo 'DEST_NOTEBOOK_BASE=/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso' >> $GITHUB_ENV
 
     - name: Deploy notebooks to Destination Workspace
