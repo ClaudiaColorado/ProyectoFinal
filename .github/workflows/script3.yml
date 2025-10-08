@@ -29,7 +29,7 @@ jobs:
         done
     - name: Set destination base once
       run: |
-      echo 'DEST_NOTEBOOK_BASE=/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso' >> $GITHUB_ENV
+        echo 'DEST_NOTEBOOK_BASE=/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso' >> $GITHUB_ENV
 
     - name: Deploy notebooks to Destination Workspace
       run: |
