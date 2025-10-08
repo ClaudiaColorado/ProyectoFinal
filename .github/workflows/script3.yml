@@ -46,7 +46,7 @@ jobs:
               -H "Authorization: Bearer $DEST_TOKEN" \
               -H "Content-Type: application/json" \
               -d "{\"path\":\"$DEST_BASE\"}" \
-              "$DEST_HOST/api/2.0/Workspace/mkdirs"
+              "$DEST_HOST/api/2.0/workspace/mkdirs"
             echo "Importando $file → $dest_path"
             response=$(curl -s -X POST \
               -H "Authorization: Bearer $DEST_TOKEN" \
@@ -56,7 +56,7 @@ jobs:
               -F "language=PYTHON" \
               -F "overwrite=true" \
               -F "content=@$file" \
-              "$DEST_HOST/api/2.0/Workspace/import")
+              "$DEST_HOST/api/2.0/workspace/import")
             echo "Response: $response"
           done
 
