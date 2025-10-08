@@ -129,7 +129,7 @@ jobs:
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
           DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-          DEST_BASE: ${{ env.DEST_NOTEBOOK_BASE }}
+          DEST_BASE: ${{ env.DEST_NOTEBOOK_BASE }}   # ej: /Workspace/Users/.../ProyectoFinal/1_Proceso
           CLUSTER_ID: ${{ env.CLUSTER_ID }}
         run: |
           set -euo pipefail
@@ -239,5 +239,126 @@ jobs:
           echo "Verificando tareas del job ${job_id}..."
           curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
             "${DEST_HOST}/api/2.1/jobs/get?job_id=${job_id}" \
-            | jq '.settings.tasks[] | {task_key, source, notebook_task,
-
+            | jq '.settings.tasks[] | {task_key, source, notebook_task, spark_python_task}'
+
+      - name: Execute Workflow WF_ProyectoFinal
+        env:
+          DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
+          DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKFLOW_NAME="WF_ProyectoFinal"
+          echo "🚀 Ejecutando workflow: $WORKFLOW_NAME"
+          workflows_list=$(curl -sS \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$DEST_HOST/api/2.1/jobs/list")
+          job_id=$(echo "$workflows_list" \
+            | jq -r --arg name "$WORKFLOW_NAME" '.jobs[]? | select(.settings.name==$name) | .job_id' \
+            | head -n1)
+          if [[ -z "${job_id:-}" || "$job_id" == "null" ]]; then
+            echo "❌ No se pudo encontrar el workflow '$WORKFLOW_NAME'"; exit 1
+          fi
+          echo "✅ Workflow $WORKFLOW_NAME encontrado con ID: $job_id"
+          payload=$(jq -n --arg id "$job_id" '{job_id: ($id|tonumber)}')
+          resp=$(curl -sS -X POST "$DEST_HOST/api/2.1/jobs/run-now" \
+            -H "Authorization: Bearer $DEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$payload" -w $'\n%{http_code}')
+          code=$(echo "$resp" | tail -n1)
+          body=$(echo "$resp" | sed '$d')
+          if [[ ! "$code" =~ ^2 ]]; then
+            echo "❌ Error al ejecutar el workflow (HTTP $code)"
+            echo "Response: $body"
+            exit 1
+          fi
+          run_id=$(echo "$body" | jq -r '.run_id')
+          if [[ -z "${run_id:-}" || "$run_id" == "null" ]]; then
+            echo "❌ No se obtuvo run_id"; echo "$body"; exit 1
+          fi
+          echo "🎯 Workflow ejecutado exitosamente!"
+          echo "Run ID: $run_id"
+          echo "WORKFLOW_RUN_ID=$run_id" >> $GITHUB_ENV
+          echo "WORKFLOW_JOB_ID=$job_id" >> $GITHUB_ENV
+          echo "🔗 URL del workflow: ${DEST_HOST}/#job/${job_id}/run/${run_id}"
+
+      - name: Monitor Workflow Execution
+        run: |
+          DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
+          DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+          RUN_ID="${{ env.WORKFLOW_RUN_ID }}"
+          JOB_ID="${{ env.WORKFLOW_JOB_ID }}"
+          echo "📊 Monitoreando ejecución del workflow WF_ProyectoFinal..."
+          echo "Job ID: $JOB_ID"
+          echo "Run ID: $RUN_ID"
+          max_wait_time=600
+          wait_time=0
+          check_interval=30
+          while [ $wait_time -lt $max_wait_time ]; do
+            run_status=$(curl -s -X GET \
+              -H "Authorization: Bearer $DEST_TOKEN" \
+              "$DEST_HOST/api/2.1/jobs/runs/get?run_id=$RUN_ID")
+            state=$(echo "$run_status" | jq -r '.state.life_cycle_state')
+            result_state=$(echo "$run_status" | jq -r '.state.result_state // "RUNNING"')
+            echo "⏱️  Estado actual: $state ($result_state) - Tiempo transcurrido: ${wait_time}s"
+            echo "$run_status" | jq -r '.tasks[]? | "  📋 " + .task_key + ": " + .state.life_cycle_state + " (" + (.state.result_state // "RUNNING") + ")"'
+            case "$state" in
+              "TERMINATED")
+                if [ "$result_state" = "SUCCESS" ]; then
+                  echo "🎉 ¡Workflow WF_ProyectoFinal completado exitosamente!"
+                  echo ""
+                  echo "📈 Resumen de ejecución:"
+                  echo "$run_status" | jq -r '.tasks[]? | "✅ " + .task_key + " → " + (.state.result_state // "SUCCESS")'
+                  start_time=$(echo "$run_status" | jq -r '.start_time')
+                  end_time=$(echo "$run_status" | jq -r '.end_time')
+                  if [ "$start_time" != "null" ] && [ "$end_time" != "null" ]; then
+                    duration=$((($end_time - $start_time) / 1000))
+                    echo "⏰ Duración total: ${duration} segundos"
+                  fi
+                  exit 0
+                else
+                  echo "❌ Workflow terminó con errores: $result_state"
+                  echo "📋 Detalles de las tareas:"
+                  echo "$run_status" | jq -r '.tasks[]? | "❌ " + .task_key + ": " + (.state.result_state // "UNKNOWN")'
+                  exit 1
+                fi
+                ;;
+              "INTERNAL_ERROR"|"SKIPPED")
+                echo "❌ Workflow falló con estado: $state"
+                exit 1
+                ;;
+              *)
+                echo "⏳ Workflow WF_ProyectoFinal aún ejecutándose..."
+                ;;
+            esac
+            sleep $check_interval
+            wait_time=$((wait_time + check_interval))
+          done
+          echo "⚠️  Timeout: El workflow aún se está ejecutando después de $max_wait_time segundos"
+          echo "🔗 Verifica el estado en: $DEST_HOST/jobs/$JOB_ID/runs/$RUN_ID"
+          echo "ℹ️  El workflow seguirá ejecutándose en Databricks"
+          exit 0
+
+      - name: Clean up
+        run: |
+          rm -rf notebooks_to_deploy
+          rm -f workflow_config.json
+
+      - name: Done
+        run: |
+          echo "🎉 ¡Despliegue y ejecución completados exitosamente!"
+          echo ""
+          echo "📊 Resumen:"
+          echo "✅ Notebooks desplegados: drop_medallion, 00_prep_env, 01_ingest, 02_transform, 03_load"
+          echo "🚀 Workflow creado: WF_ProyectoFinal"
+          echo "✅ Tareas configuradas:"
+          echo "   - 🧹 Tarea1_notebook1 (drop_medallion)"
+          echo "   - 🧰 Tarea2_notebook2 (00_prep_env)"
+          echo "   - 🛢️⬇️ Tarea3_notebook2 (01_ingest)"
+          echo "   - 🔄 Tarea4_notebook2 (02_transform)"
+          echo "   - 🛢️⬆️Tarea5_notebook2 (03_load)"
+          echo "✅ Cluster existente: cluster_SD configurado"
+          echo "🧭 Workflow ejecutado automáticamente"
+          echo ""
+          echo "🔗 Accede a tu workspace de Databricks para ver los resultados detallados"
