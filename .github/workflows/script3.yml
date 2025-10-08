@@ -213,8 +213,14 @@ jobs:
           echo "Verificando tareas del job ${job_id}..."
           curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
             "${DEST_HOST}/api/2.1/jobs/get?job_id=${job_id}" \
-            | jq '.settings.tasks[] | {task_key, source, notebook_path: (.notebook_task.notebook_path // null), spark_python_task: .spark_python_task // null}'
+            | jq '.settings.tasks[] | {
+                  task_key,
+                  source,
+                  notebook_path: (if .notebook_task then .notebook_task.notebook_path else null end),
+                  spark_python_task
+              }'
 
+          
       - name: Execute Workflow WF_ProyectoFinal
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
