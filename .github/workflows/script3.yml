@@ -202,43 +202,43 @@ jobs:
                 "existing_cluster_id": "__CLUSTER_ID__",
                 "timeout_seconds": 3600
             }
-      ]
-    }
-    JSON
+        ]
+       }
+       JSON
 
-    # Sustituciones
-    sed -i "s#__DEST_BASE__#${DEST_BASE}#g" job.json
-    sed -i "s/__CLUSTER_ID__/${CLUSTER_ID}/g" job.json
+       # Sustituciones
+       sed -i "s#__DEST_BASE__#${DEST_BASE}#g" job.json
+       sed -i "s/__CLUSTER_ID__/${CLUSTER_ID}/g" job.json
 
-    echo "Job JSON final:"
-    jq . job.json
+       echo "Job JSON final:"
+       jq . job.json
 
-    # Crear o resetear
-    create_response=$(curl -s -X POST \
-      -H "Authorization: Bearer $DEST_TOKEN" \
-      -H "Content-Type: application/json" \
-      --data-binary @job.json \
-      "$DEST_HOST/api/2.1/jobs/create")
+       # Crear o resetear
+       create_response=$(curl -s -X POST \
+         -H "Authorization: Bearer $DEST_TOKEN" \
+         -H "Content-Type: application/json" \
+         --data-binary @job.json \
+         "$DEST_HOST/api/2.1/jobs/create")
 
-    if echo "$create_response" | jq -e '.error_code=="RESOURCE_ALREADY_EXISTS"' >/dev/null 2>&1; then
-      echo "Job ya existe; aplicando reset"
-      job_id=$(curl -s -X GET -H "Authorization: Bearer $DEST_TOKEN" \
-        "$DEST_HOST/api/2.1/jobs/list" | jq -r '.jobs[] | select(.settings.name=="WF_ProyectoFinal") | .job_id')
-      curl -s -X POST -H "Authorization: Bearer $DEST_TOKEN" \
-        -H "Content-Type: application/json" \
-        --data-binary @job.json \
-        "$DEST_HOST/api/2.1/jobs/reset?job_id=${job_id}" >/dev/null
-      echo "Reset aplicado al job ${job_id}"
-    else
-      echo "Workflow creation response: $create_response"
-      if echo "$create_response" | jq -e '.job_id' >/dev/null 2>&1; then
-        echo "Workflow creado correctamente"
-      else
-        echo "❌ Error al crear el workflow"
-        echo "Response completo: $create_response"
-        exit 1
-      fi
-    fi
+       if echo "$create_response" | jq -e '.error_code=="RESOURCE_ALREADY_EXISTS"' >/dev/null 2>&1; then
+         echo "Job ya existe; aplicando reset"
+         job_id=$(curl -s -X GET -H "Authorization: Bearer $DEST_TOKEN" \
+           "$DEST_HOST/api/2.1/jobs/list" | jq -r '.jobs[] | select(.settings.name=="WF_ProyectoFinal") | .job_id')
+         curl -s -X POST -H "Authorization: Bearer $DEST_TOKEN" \
+          -H "Content-Type: application/json" \
+          --data-binary @job.json \
+          "$DEST_HOST/api/2.1/jobs/reset?job_id=${job_id}" >/dev/null
+         echo "Reset aplicado al job ${job_id}"
+       else
+         echo "Workflow creation response: $create_response"
+         if echo "$create_response" | jq -e '.job_id' >/dev/null 2>&1; then
+           echo "Workflow creado correctamente"
+         else
+           echo "❌ Error al crear el workflow"
+           echo "Response completo: $create_response"
+           exit 1
+         fi
+       fi
 
     
     - name: Execute Workflow WF_ProyectoFinal
