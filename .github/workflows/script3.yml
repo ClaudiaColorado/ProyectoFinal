@@ -32,7 +32,7 @@ jobs:
       run: |
         DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
         DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
-        DEST_BASE="/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
+        DEST_BASE="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
         for file in notebooks_to_deploy/*.py; do
           name=$(basename "$file" .py)
           dest_path="$DEST_BASE/$name"
@@ -55,6 +55,30 @@ jobs:
           echo "Response: $response"
         done
     
+    - name: Verify notebooks exist in destination
+      run: |
+        set -euo pipefail
+        DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
+        DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
+        # Debe ser la MISMA ruta que usas para crear el job:
+        DEST_BASE="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
+
+        echo "🔎 Verificando notebooks en $DEST_BASE ..."
+        for nb in drop_medallion 00_prep_env 01_ingest 02_transform 03_load; do
+          path="$DEST_BASE/$nb"
+          echo "  → $path"
+          resp=$(curl -s -H "Authorization: Bearer $DEST_TOKEN" \
+                      "$DEST_HOST/api/2.0/workspace/get-status?path=$path")
+          echo "$resp" | jq .
+
+          type=$(echo "$resp" | jq -r '.object_type // empty')
+          if [[ "$type" != "NOTEBOOK" ]]; then
+           echo "❌ No se encontró como NOTEBOOK: $path"
+           exit 1
+         fi
+        done
+        echo "✅ Todos los notebooks existen en destino."
+
     - name: Check if workflow exists and delete if necessary
       run: |
         DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
