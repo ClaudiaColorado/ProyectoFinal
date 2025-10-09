@@ -1,4 +1,4 @@
-name: Dynamic Databricks Proyecto Final Deploy v4
+name: Dynamic Databricks Proyecto Final Deploy v5
 on:
   push:
     branches:
@@ -332,6 +332,21 @@ jobs:
           echo "ℹ️  El workflow seguirá ejecutándose en Databricks"
           exit 0
 
+      - name: Download dashboard JSON from Workspace
+        env:
+          ORIGIN_HOST: ${{ secrets.DATABRICKS_ORIGIN_HOST }}
+          ORIGIN_TOKEN: ${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          WS_PATH="/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json"
+          echo "⬇️ Descargando $WS_PATH ..."
+          curl -sS -X GET \
+            -H "Authorization: Bearer ${ORIGIN_TOKEN}" \
+            "${ORIGIN_HOST}/api/2.0/workspace/export?path=${WS_PATH}&direct_download=true" \
+            -o Data_Jobs_Salaries_and_Trends.lvdash.json
+
+            ls -la Data_Jobs_Salaries_and_Trends.lvdash.json    
+
       - name: Import Lakeview dashboard (PROD)
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
@@ -340,60 +355,38 @@ jobs:
         run: |
           set -euo pipefail
 
-          # 1) Ruta al JSON exportado (en tu repo raíz, sin espacios)
-          DASH_SRC="/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json"
+          # Ruta del JSON dentro del repo (ajústala si lo guardaste en otro lugar)
+          DASH_SRC="$GITHUB_WORKSPACE/dashboards/Data_Jobs_Salaries_and_Trends.lvdash.json"
 
           echo "📁 Repo root: $GITHUB_WORKSPACE"
           ls -la "$GITHUB_WORKSPACE" || true
+          ls -la "$GITHUB_WORKSPACE/dashboards" || true
 
           if [ ! -f "$DASH_SRC" ]; then
             echo "❌ No existe $DASH_SRC"
             exit 1
           fi
 
-          # 2) Preparar el JSON:
-          #    - Eliminar posibles IDs/fechas del export
-          #    - Forzar el warehouse (dataWarehouseId)
-          #    Si el esquema no coincide, usamos el archivo tal cual (cp fallback).
-          jq --arg wh "$WH_ID" '
-            del(.dashboardId, .id, .created_at, .updated_at)
-            | ( .display.dashboardSettings.dataWarehouseId ) = $wh
-          ' "$DASH_SRC" > dash_prepared.json || cp "$DASH_SRC" dash_prepared.json
+          # Inyecta el warehouse de PROD en el payload
+          jq --arg wid "${WH_ID}" '.warehouse_id = $wid' "$DASH_SRC" > dash_payload.json
 
-          echo "🔎 Probando disponibilidad del endpoint Lakeview..."
-          # Muchas workspaces devuelven 405 a GET, pero eso indica que el recurso existe.
-          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${DEST_TOKEN}" \
-            "${DEST_HOST}/api/2.0/lakeview/dashboards" || true)
-          echo "HTTP probe: $STATUS"
-
-          if [ "$STATUS" != "200" ] && [ "$STATUS" != "401" ] && [ "$STATUS" != "403" ] && [ "$STATUS" != "405" ]; then
-            echo "❌ El endpoint /api/2.0/lakeview/dashboards no está disponible en este workspace."
-            echo "   Verifica que Lakeview API esté habilitado en tu workspace/cuenta."
-            exit 1
-          fi
-
-          echo "⬆️ Creando dashboard via POST /api/2.0/lakeview/dashboards ..."
+          echo "⬆️ Importando dashboard a Lakeview…"
           resp=$(curl -sS -X POST \
-           -H "Authorization: Bearer ${DEST_TOKEN}" \
-           -H "Content-Type: application/json" \
-           --data-binary @dash_prepared.json \
-           "${DEST_HOST}/api/2.0/lakeview/dashboards")
+            -H "Authorization: Bearer ${DEST_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data-binary @dash_payload.json \
+            "${DEST_HOST}/api/2.0/lakeview/dashboards")
 
-          echo "$resp"
+          echo "$resp" | jq . || true
 
-          dash_id=$(echo "$resp" | jq -r '.dashboardId // .id // empty')
+          dash_id=$(echo "$resp" | jq -r '.dashboard_id // .id // empty')
           if [ -z "$dash_id" ]; then
-            echo "❌ No se obtuvo dashboardId en la respuesta del create."
-            echo "   Es posible que el JSON exportado tenga un formato distinto."
-            echo "   Tips:"
-            echo "   - Asegúrate de exportar el dashboard en formato Lakeview (.lvdash.json)."
-            echo "   - Si el export trae otra estructura, elimina campos problemáticos con jq (ej. ids)."
-            exit 1
+            echo "❌ No se obtuvo dashboardId en la respuesta"
+           exit 1
           fi
 
-          echo "✅ Import OK. Dashboard ID: $dash_id"
-          echo "LAKEVIEW_DASHBOARD_ID=$dash_id" >> $GITHUB_ENV
+          echo "✅ Dashboard importado: $dash_id"
+
 
       - name: Clean up
         run: |
