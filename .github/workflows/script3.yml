@@ -199,7 +199,7 @@ jobs:
                   task_key: "04_dashboard",
                   depends_on: [{ "task_key": "03_load" }],
                   source: "WORKSPACE",
-                  notebook_task: { notebook_path: ($base_users + "/03_dashboard_setup") },
+                  notebook_task: { notebook_path: ($base_users + "/04_dashboard_setup") },
                   base_parameters: {
                     catalog": "catalogo1002",
                     gold_schema: "gold",
