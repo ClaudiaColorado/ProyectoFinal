@@ -340,7 +340,7 @@ jobs:
           WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}
         run: |
           set -euo pipefail
-          FILE="/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data Jobs - Salaries and Trends.lvdash.json"
+          FILE=/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json
           # Asegura que el JSON apunte al warehouse de PROD
           tmp="$(mktemp)"
           jq --arg wid "$WH_ID" '
@@ -406,8 +406,8 @@ jobs:
           echo "   - 🛢️⬇️ Tarea3_notebook2 (01_ingest)"
           echo "   - 🔄 Tarea4_notebook2 (02_transform)"
           echo "   - 🛢️⬆️Tarea5_notebook2 (03_load)"
-          echo "   - 🛢️⬆️Tarea6_notebook2 (04_Dashboard Setup)"
-          echo "   - 🛢️⬆️Tarea6_notebook2 (Dashboard)"
+          echo "   - ⚙️Tarea6_notebook2 (04_Dashboard Setup)"
+          echo "   - 📊📈Tarea6_notebook2 (Dashboard)"
           echo "✅ Cluster existente: cluster_SD configurado"
           echo "🧭 Workflow ejecutado automáticamente"
           echo ""
