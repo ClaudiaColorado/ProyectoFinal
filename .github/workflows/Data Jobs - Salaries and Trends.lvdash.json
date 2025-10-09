@@ -1,0 +1,916 @@
+{
+  "datasets": [
+    {
+      "name": "ddcabd44",
+      "displayName": "clean_ds_salary",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.clean_ds_salary"
+      ]
+    },
+    {
+      "name": "7c6afe0f",
+      "displayName": "avgsalary_jobtitle",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.avgsalary_jobtitle\r\n",
+        "order by avg_salary_usd desc"
+      ]
+    },
+    {
+      "name": "5a55a0df",
+      "displayName": "avgsalary_residence",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.avgsalary_residence"
+      ]
+    },
+    {
+      "name": "3088f57d",
+      "displayName": "maxsalary_per_country_jobtitle",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.maxsalary_per_country_jobtitle"
+      ]
+    },
+    {
+      "name": "5d474d69",
+      "displayName": "salary_currencies",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.salary_currencies"
+      ]
+    },
+    {
+      "name": "f6bdde5a",
+      "displayName": "v_avg_salary_by_company_size",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_company_size"
+      ]
+    },
+    {
+      "name": "26f03a58",
+      "displayName": "v_avg_salary_by_country",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_country"
+      ]
+    },
+    {
+      "name": "00a29a59",
+      "displayName": "v_avg_salary_by_seniority",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_seniority"
+      ]
+    },
+    {
+      "name": "646e3eab",
+      "displayName": "v_avg_salary_by_title",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_title"
+      ]
+    },
+    {
+      "name": "e3fb0232",
+      "displayName": "v_remote_mix_by_title",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title"
+      ]
+    },
+    {
+      "name": "78a69d0e",
+      "displayName": "v_salary",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_salary"
+      ]
+    },
+    {
+      "name": "5ee12325",
+      "displayName": "v_titles_stats",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_titles_stats"
+      ]
+    },
+    {
+      "name": "0bd4fa9b",
+      "displayName": "v_trend_by_year",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_trend_by_year"
+      ]
+    },
+    {
+      "name": "2470ece2",
+      "displayName": "clean_ds_salary",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.clean_ds_salary"
+      ]
+    },
+    {
+      "name": "e3707fd5",
+      "displayName": "v_remote_mix_by_title",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title"
+      ]
+    },
+    {
+      "name": "fcdfd05b",
+      "displayName": "v_remote_mix_by_title_long",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_long"
+      ]
+    },
+    {
+      "name": "214a1d7c",
+      "displayName": "v_remote_mix_by_title_sorted",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_sorted"
+      ]
+    },
+    {
+      "name": "b7f723aa",
+      "displayName": "v_kpis",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_kpis"
+      ]
+    },
+    {
+      "name": "ea6b08fa",
+      "displayName": "v_remote_mix_by_title_sorted",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_sorted"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "cb5a4fb8",
+      "displayName": "Data Jobs Dashboard",
+      "layout": [
+        {
+          "widget": {
+            "name": "2c86d286",
+            "multilineTextboxSpec": {
+              "lines": [
+                "#### <span style=\"text-align:center;display:block\"><span style=\"font-size: 36px;line-height: 1.5;\">Data Jobs - Salaries and Trends 2025</span></span>"
+              ]
+            },
+            "specExtensions": {
+              "widgetBackgroundColor": {
+                "dark": "#114977"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "c82599f9",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "7c6afe0f",
+                  "fields": [
+                    {
+                      "name": "job_title",
+                      "expression": "`job_title`"
+                    },
+                    {
+                      "name": "avg(avg_salary_usd)",
+                      "expression": "AVG(`avg_salary_usd`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`job_title` IN (`job_title`) OR TRUE"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "job_title",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  },
+                  "displayName": "Job_title"
+                },
+                "y": {
+                  "fieldName": "avg(avg_salary_usd)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "AVG Salary (USD)"
+                }
+              },
+              "frame": {
+                "title": "Average Salary by Job Title",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "b3e0d1ac",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "00a29a59",
+                  "fields": [
+                    {
+                      "name": "seniority",
+                      "expression": "`seniority`"
+                    },
+                    {
+                      "name": "sum(avg_salary_usd)",
+                      "expression": "SUM(`avg_salary_usd`)"
+                    },
+                    {
+                      "name": "avg(avg_salary_usd)",
+                      "expression": "AVG(`avg_salary_usd`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "seniority",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  },
+                  "displayName": "Seniority"
+                },
+                "y": {
+                  "fieldName": "avg(avg_salary_usd)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "AVG Salary( USD)"
+                },
+                "label": {
+                  "show": true
+                },
+                "extra": [
+                  {
+                    "fieldName": "seniority"
+                  },
+                  {
+                    "fieldName": "sum(avg_salary_usd)"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Average Salary by Seniority",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "47584dbb",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "f6bdde5a",
+                  "fields": [
+                    {
+                      "name": "company_size",
+                      "expression": "`company_size`"
+                    },
+                    {
+                      "name": "avg(avg_salary_usd)",
+                      "expression": "AVG(`avg_salary_usd`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "company_size",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  },
+                  "displayName": "Company Size"
+                },
+                "y": {
+                  "fieldName": "avg(avg_salary_usd)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "AVG Salary(USD)"
+                },
+                "label": {
+                  "show": true
+                },
+                "extra": [
+                  {
+                    "fieldName": "company_size"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Average Salary by Company Size",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 10,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "430df22b",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "0bd4fa9b",
+                  "fields": [
+                    {
+                      "name": "work_year",
+                      "expression": "`work_year`"
+                    },
+                    {
+                      "name": "avg(avg_salary_usd)",
+                      "expression": "AVG(`avg_salary_usd`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "work_year",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Work Year"
+                },
+                "y": {
+                  "fieldName": "avg(avg_salary_usd)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "title": "Average Salary Over the Years",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "409f0dbe",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b7f723aa",
+                  "fields": [
+                    {
+                      "name": "avg(avg_salary_usd)",
+                      "expression": "AVG(`avg_salary_usd`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(avg_salary_usd)"
+                }
+              },
+              "frame": {
+                "title": "Average Salary (USD)",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "e1dc72e8",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b7f723aa",
+                  "fields": [
+                    {
+                      "name": "postings",
+                      "expression": "`postings`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "postings"
+                }
+              },
+              "frame": {
+                "title": "Current Positions",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "0e0bf756",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b7f723aa",
+                  "fields": [
+                    {
+                      "name": "median_salary_usd",
+                      "expression": "`median_salary_usd`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "median_salary_usd"
+                }
+              },
+              "frame": {
+                "title": "Median Salary (USD)",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "5edf069c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b7f723aa",
+                  "fields": [
+                    {
+                      "name": "onsite_share_pct",
+                      "expression": "`onsite_share_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "onsite_share_pct"
+                }
+              },
+              "frame": {
+                "title": "%Onsite ",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "42cfcc70",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b7f723aa",
+                  "fields": [
+                    {
+                      "name": "remote_share_pct",
+                      "expression": "`remote_share_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "remote_share_pct"
+                }
+              },
+              "frame": {
+                "title": "%Remote",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "00eba42e",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "b7f723aa",
+                  "fields": [
+                    {
+                      "name": "hybrid_share_pct",
+                      "expression": "`hybrid_share_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "hybrid_share_pct"
+                }
+              },
+              "frame": {
+                "title": "%Hybrid",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "5db8c24c",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "214a1d7c",
+                  "fields": [
+                    {
+                      "name": "job_title",
+                      "expression": "`job_title`"
+                    },
+                    {
+                      "name": "Onsite",
+                      "expression": "`Onsite`"
+                    },
+                    {
+                      "name": "Remote",
+                      "expression": "`Remote`"
+                    },
+                    {
+                      "name": "Hybrid",
+                      "expression": "`Hybrid`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "area",
+              "encodings": {
+                "x": {
+                  "fieldName": "job_title",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Job Title"
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "Onsite"
+                    },
+                    {
+                      "fieldName": "Remote"
+                    },
+                    {
+                      "fieldName": "Hybrid"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Type of Work Trend"
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 4,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "2d01fa8a",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "26f03a58",
+                  "fields": [
+                    {
+                      "name": "country",
+                      "expression": "`country`"
+                    },
+                    {
+                      "name": "avg(avg_salary_usd)",
+                      "expression": "AVG(`avg_salary_usd`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "country",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  },
+                  "displayName": "Country"
+                },
+                "y": {
+                  "fieldName": "avg(avg_salary_usd)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "title": "Average Salary by Country",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 17,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "4ad543dd",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "efb6eeab",
+            "queries": [
+              {
+                "name": "dashboards/01f0a4b5b531133aa69333f15c882e3c/datasets/01f0a51e400d141792be40dc0e894c91_work_year",
+                "query": {
+                  "datasetName": "ddcabd44",
+                  "fields": [
+                    {
+                      "name": "work_year",
+                      "expression": "`work_year`"
+                    },
+                    {
+                      "name": "work_year_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "work_year",
+                    "queryName": "dashboards/01f0a4b5b531133aa69333f15c882e3c/datasets/01f0a51e400d141792be40dc0e894c91_work_year"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#FAFAFB",
+        "dark": "#1F272D"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#11171C"
+      },
+      "fontColor": {
+        "light": "#11171C",
+        "dark": "#E8ECF0"
+      },
+      "selectionColor": {
+        "light": "#2272B4",
+        "dark": "#8ACAFF"
+      },
+      "visualizationColors": [
+        "#077A9D",
+        "#FFAB00",
+        "#00A972",
+        "#FF3621",
+        "#8BCAE7",
+        "#AB4057",
+        "#99DDB4",
+        "#FCA4A1",
+        "#919191",
+        "#BF7080"
+      ],
+      "widgetHeaderAlignment": "LEFT"
+    }
+  }
+}
