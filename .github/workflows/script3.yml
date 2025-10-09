@@ -207,7 +207,7 @@ jobs:
                   },
                   existing_cluster_id: $cid,
                   timeout_seconds: 3600
-                },
+                }
               
              ]
             }' > settings.json
