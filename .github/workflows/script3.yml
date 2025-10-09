@@ -19,7 +19,7 @@ jobs:
           ORIGIN_HOST=${{ secrets.DATABRICKS_ORIGIN_HOST }}
           ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
           NOTEBOOK_BASE="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
-          NOTEBOOKS=("drop_medallion" "00_prep_env" "01_ingest" "02_transform" "03_load")
+          NOTEBOOKS=("drop_medallion" "00_prep_env" "01_ingest" "02_transform" "03_load" "04_dashboard_setup")
           mkdir -p notebooks_to_deploy
           for nb in "${NOTEBOOKS[@]}"; do
             echo "Exportando $nb en modo raw..."
@@ -194,8 +194,22 @@ jobs:
                   notebook_task: { notebook_path: ($base_users + "/03_load") },
                   existing_cluster_id: $cid,
                   timeout_seconds: 3600
-                }
-              ]
+                },
+                {
+                  task_key: "04_dashboard",
+                  depends_on: [{ "task_key": "03_load" }],
+                  source: "WORKSPACE",
+                  notebook_task: { notebook_path: ($base_users + "/03_dashboard_setup") },
+                  base_parameters: {
+                    catalog": "catalogo1002",
+                    gold_schema: "gold",
+                    create_views: "si"  // para crear/actualice vistas
+                  }
+                  existing_cluster_id: $cid,
+                  timeout_seconds: 3600
+                },
+              
+             ]
             }' > settings.json
           echo "Settings a crear:"; jq . settings.json
           # 2) Crear el job limpio
