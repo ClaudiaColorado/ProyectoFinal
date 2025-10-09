@@ -332,61 +332,46 @@ jobs:
           echo "ℹ️  El workflow seguirá ejecutándose en Databricks"
           exit 0
 
-      - name: Import Lakeview dashboard to PROD
-        shell: bash
+      - name: Import Lakeview dashboard (PROD)
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
           DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}
+          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}   # ID del SQL Warehouse de PROD
         run: |
           set -euo pipefail
-          FILE=/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json
-          # Asegura que el JSON apunte al warehouse de PROD
-          tmp="$(mktemp)"
-          jq --arg wid "$WH_ID" '
-            if .dashboard.settings.compute != null then
-              .dashboard.settings.compute.warehouseId = $wid
-            else
-              .dashboard.settings.compute = { "warehouseId": $wid }
-            end
-          ' "$FILE" > "$tmp"
-          # Intenta encontrar un dashboard con el mismo nombre para upsert
-          name="$(jq -r '.dashboard.displayName' "$tmp")"
-          # Busca por nombre 
-          existing_id="$(curl -s -H "Authorization: Bearer $DEST_TOKEN" \
-            "$DEST_HOST/api/2.0/lakeview/dashboards" \
-            | jq -r --arg n "$name" '.dashboards[]? | select(.displayName==$n) | .id' | head -n1 || true)"
-          if [[ -n "${existing_id:-}" ]]; then
-            echo "Updating dashboard: $name ($existing_id)"
-            curl -s -X PATCH \
-              -H "Authorization: Bearer $DEST_TOKEN" \
-              -H "Content-Type: application/json" \
-              --data-binary @"$tmp" \
-              "$DEST_HOST/api/2.0/lakeview/dashboards/${existing_id}" >/dev/null
-            echo "✅ Dashboard updated"
-          else
-            echo "Creating dashboard: $name"
-            # si workspaces usa endpoint de import; si no existe,  POST /dashboards
-            create_resp="$(
-              curl -s -X POST \
-                -H "Authorization: Bearer $DEST_TOKEN" \
-                -H "Content-Type: application/json" \
-                --data-binary @"$tmp" \
-                "$DEST_HOST/api/2.0/lakeview/dashboards/import" || true
-            )"
-            if ! echo "$create_resp" | jq -e '.id' >/dev/null 2>&1; then
-              # Fallback a create "normal"
-              create_resp="$(
-                curl -s -X POST \
-                  -H "Authorization: Bearer $DEST_TOKEN" \
-                  -H "Content-Type: application/json" \
-                  --data-binary @"$tmp" \
-                  "$DEST_HOST/api/2.0/lakeview/dashboards"
-              )"
-            fi
-            echo "Response:"
-            echo "$create_resp" | jq .
+
+          # Ruta RELATIVA dentro del repo
+          DASH_SRC=".github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json"
+      
+          echo "📁 Repo root: $GITHUB_WORKSPACE"
+          ls -la "$GITHUB_WORKSPACE/.github/workflows" || true
+
+          if [ ! -f "$DASH_SRC" ]; then
+            echo "❌ No existe $DASH_SRC"; exit 1
           fi
+
+          # (Opcional) Inyectar/actualizar el Warehouse ID en el JSON exportado
+          # Si tu export no trae esa clave, jq fallará y hacemos cp como fallback.
+          jq --arg wh "$WH_ID" \
+            '.display.dashboardSettings.dataWarehouseId = $wh' \
+            "$DASH_SRC" > dash_prepared.json || cp "$DASH_SRC" dash_prepared.json
+
+          echo "⬆️ Importando dashboard a Lakeview…"
+          resp=$(curl -sS -X POST \
+            -H "Authorization: Bearer ${DEST_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data-binary @dash_prepared.json \
+            "${DEST_HOST}/api/2.0/lakeview/dashboards/import")
+
+          echo "$resp"
+          dash_id=$(echo "$resp" | jq -r '.dashboardId // .id // empty')
+          if [ -z "$dash_id" ]; then
+            echo "❌ No se obtuvo dashboardId en la respuesta"; exit 1
+          fi
+
+          echo "✅ Import OK. Dashboard ID: $dash_id"
+          echo "LAKEVIEW_DASHBOARD_ID=$dash_id" >> $GITHUB_ENV
+
 
       - name: Clean up
         run: |
