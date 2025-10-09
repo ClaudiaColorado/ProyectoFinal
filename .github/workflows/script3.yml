@@ -204,7 +204,7 @@ jobs:
                     catalog: "catalogo1002",
                     gold_schema: "gold",
                     create_views: "si"  // para crear/actualice vistas
-                  }
+                  },
                   existing_cluster_id: $cid,
                   timeout_seconds: 3600
                 },
