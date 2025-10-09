@@ -339,7 +339,7 @@ jobs:
         run: |
           set -euo pipefail
           # Ruta EXACTA del archivo en Workspace
-          WS_PATH="/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json"
+          WS_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/Dashboard/Data_Jobs_Salaries_and_Trends.lvdash.json"
 
           echo "⬇️ Descargando dashboard JSON desde Workspace..."
           curl -sS -X GET \
@@ -363,7 +363,7 @@ jobs:
           set -euo pipefail
 
           # Ruta del JSON dentro del repo (ajústala si lo guardaste en otro lugar)
-          DASH_SRC="$GITHUB_WORKSPACE/dashboards/Data_Jobs_Salaries_and_Trends.lvdash.json"
+          DASH_SRC="$GITHUB_WORKSPACE/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json
 
           echo "📁 Repo root: $GITHUB_WORKSPACE"
           ls -la "$GITHUB_WORKSPACE" || true
