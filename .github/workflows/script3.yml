@@ -201,7 +201,7 @@ jobs:
                   source: "WORKSPACE",
                   notebook_task: { notebook_path: ($base_users + "/04_dashboard_setup") },
                   base_parameters: {
-                    catalog": "catalogo1002",
+                    catalog: "catalogo1002",
                     gold_schema: "gold",
                     create_views: "si"  // para crear/actualice vistas
                   }
