@@ -1,10 +1,39 @@
 {
   "datasets": [
     {
-      "name": "b7f723aa",
-      "displayName": "v_kpis",
+      "name": "f6bdde5a",
+      "displayName": "v_avg_salary_by_company_size",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_kpis"
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_company_size"
+      ]
+    },
+    {
+      "name": "3088f57d",
+      "displayName": "maxsalary_per_country_jobtitle",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.maxsalary_per_country_jobtitle"
+      ]
+    },
+    {
+      "name": "0bd4fa9b",
+      "displayName": "v_trend_by_year",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_trend_by_year"
+      ]
+    },
+    {
+      "name": "5d474d69",
+      "displayName": "salary_currencies",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.salary_currencies"
+      ]
+    },
+    {
+      "name": "7c6afe0f",
+      "displayName": "avgsalary_jobtitle",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.avgsalary_jobtitle\r\n",
+        "order by avg_salary_usd desc"
       ]
     },
     {
@@ -22,6 +51,62 @@
       ]
     },
     {
+      "name": "2470ece2",
+      "displayName": "clean_ds_salary",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.clean_ds_salary"
+      ]
+    },
+    {
+      "name": "26f03a58",
+      "displayName": "v_avg_salary_by_country",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_country"
+      ]
+    },
+    {
+      "name": "5a55a0df",
+      "displayName": "avgsalary_residence",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.avgsalary_residence"
+      ]
+    },
+    {
+      "name": "e3707fd5",
+      "displayName": "v_remote_mix_by_title",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title"
+      ]
+    },
+    {
+      "name": "b7f723aa",
+      "displayName": "v_kpis",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_kpis"
+      ]
+    },
+    {
+      "name": "ea6b08fa",
+      "displayName": "v_remote_mix_by_title_sorted",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_sorted"
+      ]
+    },
+    {
+      "name": "646e3eab",
+      "displayName": "v_avg_salary_by_title",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_title"
+      ]
+    },
+    {
+      "name": "5ee12325",
+      "displayName": "v_titles_stats",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_titles_stats"
+      ]
+    },
+    {
       "name": "e3fb0232",
       "displayName": "v_remote_mix_by_title",
       "queryLines": [
@@ -36,77 +121,6 @@
       ]
     },
     {
-      "name": "7c6afe0f",
-      "displayName": "avgsalary_jobtitle",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.avgsalary_jobtitle\r\n",
-        "order by avg_salary_usd desc"
-      ]
-    },
-    {
-      "name": "26f03a58",
-      "displayName": "v_avg_salary_by_country",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_country"
-      ]
-    },
-    {
-      "name": "ea6b08fa",
-      "displayName": "v_remote_mix_by_title_sorted",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_sorted"
-      ]
-    },
-    {
-      "name": "5d474d69",
-      "displayName": "salary_currencies",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.salary_currencies"
-      ]
-    },
-    {
-      "name": "2470ece2",
-      "displayName": "clean_ds_salary",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.clean_ds_salary"
-      ]
-    },
-    {
-      "name": "646e3eab",
-      "displayName": "v_avg_salary_by_title",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_title"
-      ]
-    },
-    {
-      "name": "e3707fd5",
-      "displayName": "v_remote_mix_by_title",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title"
-      ]
-    },
-    {
-      "name": "0bd4fa9b",
-      "displayName": "v_trend_by_year",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_trend_by_year"
-      ]
-    },
-    {
-      "name": "3088f57d",
-      "displayName": "maxsalary_per_country_jobtitle",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.maxsalary_per_country_jobtitle"
-      ]
-    },
-    {
-      "name": "fcdfd05b",
-      "displayName": "v_remote_mix_by_title_long",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_long"
-      ]
-    },
-    {
       "name": "ddcabd44",
       "displayName": "clean_ds_salary",
       "queryLines": [
@@ -114,24 +128,10 @@
       ]
     },
     {
-      "name": "5ee12325",
-      "displayName": "v_titles_stats",
+      "name": "fcdfd05b",
+      "displayName": "v_remote_mix_by_title_long",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_titles_stats"
-      ]
-    },
-    {
-      "name": "f6bdde5a",
-      "displayName": "v_avg_salary_by_company_size",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_company_size"
-      ]
-    },
-    {
-      "name": "5a55a0df",
-      "displayName": "avgsalary_residence",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.avgsalary_residence"
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_long"
       ]
     }
   ],
