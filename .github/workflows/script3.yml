@@ -203,7 +203,7 @@ jobs:
                   base_parameters: {
                     catalog: "catalogo1002",
                     gold_schema: "gold",
-                    create_views: "si"  // para crear/actualice vistas
+                    create_views: "si"  
                   },
                   existing_cluster_id: $cid,
                   timeout_seconds: 3600
