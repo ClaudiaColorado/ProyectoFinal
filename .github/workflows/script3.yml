@@ -208,8 +208,7 @@ jobs:
                   existing_cluster_id: $cid,
                   timeout_seconds: 3600
                 }
-              
-             ]
+              ]
             }' > settings.json
           echo "Settings a crear:"; jq . settings.json
           # 2) Crear el job limpio
@@ -234,7 +233,6 @@ jobs:
                   spark_python_task
               }'
 
-          
       - name: Execute Workflow WF_ProyectoFinal
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
@@ -333,7 +331,8 @@ jobs:
           echo "🔗 Verifica el estado en: $DEST_HOST/jobs/$JOB_ID/runs/$RUN_ID"
           echo "ℹ️  El workflow seguirá ejecutándose en Databricks"
           exit 0
-      - name: Import/Upsert Lakeview dashboard to PROD
+
+      - name: Import Lakeview dashboard to PROD
         shell: bash
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
@@ -341,59 +340,53 @@ jobs:
           WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}
         run: |
           set -euo pipefail
-
-          FILE="dashboards/salaries_lakeview.json"
-
+          FILE="/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data Jobs - Salaries and Trends.lvdash.json"
           # Asegura que el JSON apunte al warehouse de PROD
           tmp="$(mktemp)"
           jq --arg wid "$WH_ID" '
-           if .dashboard.settings.compute != null then
+            if .dashboard.settings.compute != null then
               .dashboard.settings.compute.warehouseId = $wid
-           else
+            else
               .dashboard.settings.compute = { "warehouseId": $wid }
-           end
-         ' "$FILE" > "$tmp"
-
-         # Intenta encontrar un dashboard con el mismo nombre para upsert
-         name="$(jq -r '.dashboard.displayName' "$tmp")"
-
-        # Busca por nombre 
-        existing_id="$(curl -s -H "Authorization: Bearer $DEST_TOKEN" \
-          "$DEST_HOST/api/2.0/lakeview/dashboards" \
-          | jq -r --arg n "$name" '.dashboards[]? | select(.displayName==$n) | .id' | head -n1 || true)"
-
-        if [[ -n "${existing_id:-}" ]]; then
-          echo "Updating dashboard: $name ($existing_id)"
-          curl -s -X PATCH \
-            -H "Authorization: Bearer $DEST_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @"$tmp" \
-            "$DEST_HOST/api/2.0/lakeview/dashboards/${existing_id}" >/dev/null
-          echo "✅ Dashboard updated"
-        else
-          echo "Creating dashboard: $name"
-          # si workspaces usa endpoint de import; si no existe,  POST /dashboards
-          create_resp="$(
-            curl -s -X POST \
-             -H "Authorization: Bearer $DEST_TOKEN" \
-             -H "Content-Type: application/json" \
-             --data-binary @"$tmp" \
-             "$DEST_HOST/api/2.0/lakeview/dashboards/import" || true
-          )"
-          if ! echo "$create_resp" | jq -e '.id' >/dev/null 2>&1; then
-          # Fallback a create "normal"
-           create_resp="$(
-             curl -s -X POST \
-               -H "Authorization: Bearer $DEST_TOKEN" \
-               -H "Content-Type: application/json" \
-               --data-binary @"$tmp" \
-               "$DEST_HOST/api/2.0/lakeview/dashboards"
+            end
+          ' "$FILE" > "$tmp"
+          # Intenta encontrar un dashboard con el mismo nombre para upsert
+          name="$(jq -r '.dashboard.displayName' "$tmp")"
+          # Busca por nombre 
+          existing_id="$(curl -s -H "Authorization: Bearer $DEST_TOKEN" \
+            "$DEST_HOST/api/2.0/lakeview/dashboards" \
+            | jq -r --arg n "$name" '.dashboards[]? | select(.displayName==$n) | .id' | head -n1 || true)"
+          if [[ -n "${existing_id:-}" ]]; then
+            echo "Updating dashboard: $name ($existing_id)"
+            curl -s -X PATCH \
+              -H "Authorization: Bearer $DEST_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data-binary @"$tmp" \
+              "$DEST_HOST/api/2.0/lakeview/dashboards/${existing_id}" >/dev/null
+            echo "✅ Dashboard updated"
+          else
+            echo "Creating dashboard: $name"
+            # si workspaces usa endpoint de import; si no existe,  POST /dashboards
+            create_resp="$(
+              curl -s -X POST \
+                -H "Authorization: Bearer $DEST_TOKEN" \
+                -H "Content-Type: application/json" \
+                --data-binary @"$tmp" \
+                "$DEST_HOST/api/2.0/lakeview/dashboards/import" || true
             )"
+            if ! echo "$create_resp" | jq -e '.id' >/dev/null 2>&1; then
+              # Fallback a create "normal"
+              create_resp="$(
+                curl -s -X POST \
+                  -H "Authorization: Bearer $DEST_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  --data-binary @"$tmp" \
+                  "$DEST_HOST/api/2.0/lakeview/dashboards"
+              )"
+            fi
+            echo "Response:"
+            echo "$create_resp" | jq .
           fi
-          echo "Response:"
-          echo "$create_resp" | jq .
-       fi
-    
 
       - name: Clean up
         run: |
@@ -413,6 +406,8 @@ jobs:
           echo "   - 🛢️⬇️ Tarea3_notebook2 (01_ingest)"
           echo "   - 🔄 Tarea4_notebook2 (02_transform)"
           echo "   - 🛢️⬆️Tarea5_notebook2 (03_load)"
+          echo "   - 🛢️⬆️Tarea6_notebook2 (04_Dashboard Setup)"
+          echo "   - 🛢️⬆️Tarea6_notebook2 (Dashboard)"
           echo "✅ Cluster existente: cluster_SD configurado"
           echo "🧭 Workflow ejecutado automáticamente"
           echo ""
