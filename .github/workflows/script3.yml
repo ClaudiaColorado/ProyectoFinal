@@ -334,18 +334,25 @@ jobs:
 
       - name: Download dashboard JSON from Workspace
         env:
-          ORIGIN_HOST: ${{ secrets.DATABRICKS_ORIGIN_HOST }}
-          ORIGIN_TOKEN: ${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
+          DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
+          DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
         run: |
           set -euo pipefail
+          # Ruta EXACTA del archivo en Workspace
           WS_PATH="/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json"
-          echo "⬇️ Descargando $WS_PATH ..."
-          curl -sS -X GET \
-            -H "Authorization: Bearer ${ORIGIN_TOKEN}" \
-            "${ORIGIN_HOST}/api/2.0/workspace/export?path=${WS_PATH}&direct_download=true" \
-            -o Data_Jobs_Salaries_and_Trends.lvdash.json
 
-            ls -la Data_Jobs_Salaries_and_Trends.lvdash.json    
+          echo "⬇️ Descargando dashboard JSON desde Workspace..."
+          curl -sS -X GET \
+            -H "Authorization: Bearer ${DEST_TOKEN}" \
+            "${DEST_HOST}/api/2.0/workspace/export?path=${WS_PATH}&format=SOURCE&direct_download=true" \
+            --output dash_payload_base.json
+
+          if [ ! -s dash_payload_base.json ]; then
+            echo "❌ No se pudo descargar ${WS_PATH}"
+            exit 1
+          fi
+          echo "✅ JSON descargado a dash_payload_base.json"
+
 
       - name: Import Lakeview dashboard (PROD)
         env:
