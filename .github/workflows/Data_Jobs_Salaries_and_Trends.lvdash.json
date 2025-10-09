@@ -1,10 +1,38 @@
 {
   "datasets": [
     {
-      "name": "ddcabd44",
-      "displayName": "clean_ds_salary",
+      "name": "b7f723aa",
+      "displayName": "v_kpis",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.clean_ds_salary"
+        "SELECT * FROM catalogo1002.gold.v_kpis"
+      ]
+    },
+    {
+      "name": "214a1d7c",
+      "displayName": "v_remote_mix_by_title_sorted",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_sorted"
+      ]
+    },
+    {
+      "name": "78a69d0e",
+      "displayName": "v_salary",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_salary"
+      ]
+    },
+    {
+      "name": "e3fb0232",
+      "displayName": "v_remote_mix_by_title",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title"
+      ]
+    },
+    {
+      "name": "00a29a59",
+      "displayName": "v_avg_salary_by_seniority",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_seniority"
       ]
     },
     {
@@ -16,17 +44,17 @@
       ]
     },
     {
-      "name": "5a55a0df",
-      "displayName": "avgsalary_residence",
+      "name": "26f03a58",
+      "displayName": "v_avg_salary_by_country",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.avgsalary_residence"
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_country"
       ]
     },
     {
-      "name": "3088f57d",
-      "displayName": "maxsalary_per_country_jobtitle",
+      "name": "ea6b08fa",
+      "displayName": "v_remote_mix_by_title_sorted",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.maxsalary_per_country_jobtitle"
+        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_sorted"
       ]
     },
     {
@@ -37,24 +65,10 @@
       ]
     },
     {
-      "name": "f6bdde5a",
-      "displayName": "v_avg_salary_by_company_size",
+      "name": "2470ece2",
+      "displayName": "clean_ds_salary",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_company_size"
-      ]
-    },
-    {
-      "name": "26f03a58",
-      "displayName": "v_avg_salary_by_country",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_country"
-      ]
-    },
-    {
-      "name": "00a29a59",
-      "displayName": "v_avg_salary_by_seniority",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_seniority"
+        "SELECT * FROM catalogo1002.gold.clean_ds_salary"
       ]
     },
     {
@@ -65,24 +79,10 @@
       ]
     },
     {
-      "name": "e3fb0232",
+      "name": "e3707fd5",
       "displayName": "v_remote_mix_by_title",
       "queryLines": [
         "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title"
-      ]
-    },
-    {
-      "name": "78a69d0e",
-      "displayName": "v_salary",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_salary"
-      ]
-    },
-    {
-      "name": "5ee12325",
-      "displayName": "v_titles_stats",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_titles_stats"
       ]
     },
     {
@@ -93,17 +93,10 @@
       ]
     },
     {
-      "name": "2470ece2",
-      "displayName": "clean_ds_salary",
+      "name": "3088f57d",
+      "displayName": "maxsalary_per_country_jobtitle",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.clean_ds_salary"
-      ]
-    },
-    {
-      "name": "e3707fd5",
-      "displayName": "v_remote_mix_by_title",
-      "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title"
+        "SELECT * FROM catalogo1002.gold.maxsalary_per_country_jobtitle"
       ]
     },
     {
@@ -114,28 +107,87 @@
       ]
     },
     {
-      "name": "214a1d7c",
-      "displayName": "v_remote_mix_by_title_sorted",
+      "name": "ddcabd44",
+      "displayName": "clean_ds_salary",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_sorted"
+        "SELECT * FROM catalogo1002.gold.clean_ds_salary"
       ]
     },
     {
-      "name": "b7f723aa",
-      "displayName": "v_kpis",
+      "name": "5ee12325",
+      "displayName": "v_titles_stats",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_kpis"
+        "SELECT * FROM catalogo1002.gold.v_titles_stats"
       ]
     },
     {
-      "name": "ea6b08fa",
-      "displayName": "v_remote_mix_by_title_sorted",
+      "name": "f6bdde5a",
+      "displayName": "v_avg_salary_by_company_size",
       "queryLines": [
-        "SELECT * FROM catalogo1002.gold.v_remote_mix_by_title_sorted"
+        "SELECT * FROM catalogo1002.gold.v_avg_salary_by_company_size"
+      ]
+    },
+    {
+      "name": "5a55a0df",
+      "displayName": "avgsalary_residence",
+      "queryLines": [
+        "SELECT * FROM catalogo1002.gold.avgsalary_residence"
       ]
     }
   ],
   "pages": [
+    {
+      "name": "4ad543dd",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "efb6eeab",
+            "queries": [
+              {
+                "name": "dashboards/01f0a4b5b531133aa69333f15c882e3c/datasets/01f0a51e400d141792be40dc0e894c91_work_year",
+                "query": {
+                  "datasetName": "ddcabd44",
+                  "fields": [
+                    {
+                      "name": "work_year",
+                      "expression": "`work_year`"
+                    },
+                    {
+                      "name": "work_year_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "work_year",
+                    "queryName": "dashboards/01f0a4b5b531133aa69333f15c882e3c/datasets/01f0a51e400d141792be40dc0e894c91_work_year"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS"
+    },
     {
       "name": "cb5a4fb8",
       "displayName": "Data Jobs Dashboard",
@@ -826,58 +878,6 @@
         }
       ],
       "pageType": "PAGE_TYPE_CANVAS"
-    },
-    {
-      "name": "4ad543dd",
-      "displayName": "Global Filters",
-      "layout": [
-        {
-          "widget": {
-            "name": "efb6eeab",
-            "queries": [
-              {
-                "name": "dashboards/01f0a4b5b531133aa69333f15c882e3c/datasets/01f0a51e400d141792be40dc0e894c91_work_year",
-                "query": {
-                  "datasetName": "ddcabd44",
-                  "fields": [
-                    {
-                      "name": "work_year",
-                      "expression": "`work_year`"
-                    },
-                    {
-                      "name": "work_year_associativity",
-                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-single-select",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "work_year",
-                    "queryName": "dashboards/01f0a4b5b531133aa69333f15c882e3c/datasets/01f0a51e400d141792be40dc0e894c91_work_year"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 0,
-            "width": 1,
-            "height": 2
-          }
-        }
-      ],
-      "pageType": "PAGE_TYPE_GLOBAL_FILTERS"
     }
   ],
   "uiSettings": {
