@@ -341,7 +341,7 @@ jobs:
           set -euo pipefail
 
           # 1) Ruta al JSON exportado (en tu repo raíz, sin espacios)
-          DASH_SRC="Data_Jobs_Salaries_and_Trends.lvdash.json"
+          DASH_SRC="/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json"
 
           echo "📁 Repo root: $GITHUB_WORKSPACE"
           ls -la "$GITHUB_WORKSPACE" || true
