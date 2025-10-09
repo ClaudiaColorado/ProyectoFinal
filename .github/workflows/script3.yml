@@ -336,42 +336,64 @@ jobs:
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
           DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}   # ID del SQL Warehouse de PROD
+          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}
         run: |
           set -euo pipefail
 
-          # Ruta RELATIVA dentro del repo
-          DASH_SRC=".github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json"
-      
+          # 1) Ruta al JSON exportado (en tu repo raíz, sin espacios)
+          DASH_SRC="Data_Jobs_Salaries_and_Trends.lvdash.json"
+
           echo "📁 Repo root: $GITHUB_WORKSPACE"
-          ls -la "$GITHUB_WORKSPACE/.github/workflows" || true
+          ls -la "$GITHUB_WORKSPACE" || true
 
           if [ ! -f "$DASH_SRC" ]; then
-            echo "❌ No existe $DASH_SRC"; exit 1
+            echo "❌ No existe $DASH_SRC"
+            exit 1
           fi
 
-          # (Opcional) Inyectar/actualizar el Warehouse ID en el JSON exportado
-          # Si tu export no trae esa clave, jq fallará y hacemos cp como fallback.
-          jq --arg wh "$WH_ID" \
-            '.display.dashboardSettings.dataWarehouseId = $wh' \
-            "$DASH_SRC" > dash_prepared.json || cp "$DASH_SRC" dash_prepared.json
+          # 2) Preparar el JSON:
+          #    - Eliminar posibles IDs/fechas del export
+          #    - Forzar el warehouse (dataWarehouseId)
+          #    Si el esquema no coincide, usamos el archivo tal cual (cp fallback).
+          jq --arg wh "$WH_ID" '
+            del(.dashboardId, .id, .created_at, .updated_at)
+            | ( .display.dashboardSettings.dataWarehouseId ) = $wh
+          ' "$DASH_SRC" > dash_prepared.json || cp "$DASH_SRC" dash_prepared.json
 
-          echo "⬆️ Importando dashboard a Lakeview…"
-          resp=$(curl -sS -X POST \
+          echo "🔎 Probando disponibilidad del endpoint Lakeview..."
+          # Muchas workspaces devuelven 405 a GET, pero eso indica que el recurso existe.
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${DEST_TOKEN}" \
-            -H "Content-Type: application/json" \
-            --data-binary @dash_prepared.json \
-            "${DEST_HOST}/api/2.0/lakeview/dashboards/import")
+            "${DEST_HOST}/api/2.0/lakeview/dashboards" || true)
+          echo "HTTP probe: $STATUS"
+
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "401" ] && [ "$STATUS" != "403" ] && [ "$STATUS" != "405" ]; then
+            echo "❌ El endpoint /api/2.0/lakeview/dashboards no está disponible en este workspace."
+            echo "   Verifica que Lakeview API esté habilitado en tu workspace/cuenta."
+            exit 1
+          fi
+
+          echo "⬆️ Creando dashboard via POST /api/2.0/lakeview/dashboards ..."
+          resp=$(curl -sS -X POST \
+           -H "Authorization: Bearer ${DEST_TOKEN}" \
+           -H "Content-Type: application/json" \
+           --data-binary @dash_prepared.json \
+           "${DEST_HOST}/api/2.0/lakeview/dashboards")
 
           echo "$resp"
+
           dash_id=$(echo "$resp" | jq -r '.dashboardId // .id // empty')
           if [ -z "$dash_id" ]; then
-            echo "❌ No se obtuvo dashboardId en la respuesta"; exit 1
+            echo "❌ No se obtuvo dashboardId en la respuesta del create."
+            echo "   Es posible que el JSON exportado tenga un formato distinto."
+            echo "   Tips:"
+            echo "   - Asegúrate de exportar el dashboard en formato Lakeview (.lvdash.json)."
+            echo "   - Si el export trae otra estructura, elimina campos problemáticos con jq (ej. ids)."
+            exit 1
           fi
 
           echo "✅ Import OK. Dashboard ID: $dash_id"
           echo "LAKEVIEW_DASHBOARD_ID=$dash_id" >> $GITHUB_ENV
-
 
       - name: Clean up
         run: |
