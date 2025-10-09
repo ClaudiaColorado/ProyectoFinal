@@ -67,7 +67,7 @@ jobs:
           DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
           DEST_BASE="${{ env.DEST_NOTEBOOK_BASE }}"
           echo "🔎 Verificando notebooks en $DEST_BASE ..."
-          for nb in drop_medallion 00_prep_env 01_ingest 02_transform 03_load; do
+          for nb in drop_medallion 00_prep_env 01_ingest 02_transform 03_load 04_dashboard_setup; do
             path="$DEST_BASE/$nb"
             echo "  → $path"
             resp=$(curl -s -H "Authorization: Bearer $DEST_TOKEN" \
@@ -85,7 +85,7 @@ jobs:
         run: |
           DEST_HOST=${{ secrets.DATABRICKS_DEST_HOST }}
           DEST_TOKEN=${{ secrets.DATABRICKS_DEST_TOKEN }}
-          WORKFLOW_NAME="WF_ADB"
+          WORKFLOW_NAME="WF_ProyectoFinal"
           echo "Verificando si existe el workflow: $WORKFLOW_NAME"
           workflows_response=$(curl -s -X GET \
             -H "Authorization: Bearer $DEST_TOKEN" \
@@ -129,7 +129,7 @@ jobs:
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
           DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-          DEST_BASE: ${{ env.DEST_NOTEBOOK_BASE }}   # define esto igual que en deploy/verify
+          DEST_BASE: ${{ env.DEST_NOTEBOOK_BASE }} 
           CLUSTER_ID: ${{ env.CLUSTER_ID }}
         run: |
           set -euo pipefail
@@ -148,7 +148,6 @@ jobs:
             echo "Job ${existing_id} eliminado"
           fi
           # 1) Construir settings.json sólo con notebook_task y rutas /Users/...
-          #    OJO: aquí usamos /Users/... (no /Workspace/Users/...) para notebook_path
           jq -n \
             --arg base_users "$(echo "${DEST_BASE}" | sed 's#^/Workspace##')" \
             --arg cid  "$CLUSTER_ID" \
@@ -332,69 +331,80 @@ jobs:
           echo "ℹ️  El workflow seguirá ejecutándose en Databricks"
           exit 0
 
-      - name: Download dashboard JSON from Workspace
-        env:
-          DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
-          DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-        run: |
-          set -euo pipefail
-          # Ruta EXACTA del archivo en Workspace
-          WS_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/Dashboard/Data_Jobs_Salaries_and_Trends.lvdash.json"
-
-          echo "⬇️ Descargando dashboard JSON desde Workspace..."
-          curl -sS -X GET \
-            -H "Authorization: Bearer ${DEST_TOKEN}" \
-            "${DEST_HOST}/api/2.0/workspace/export?path=${WS_PATH}&format=SOURCE&direct_download=true" \
-            --output dash_payload_base.json
-
-          if [ ! -s dash_payload_base.json ]; then
-            echo "❌ No se pudo descargar ${WS_PATH}"
-            exit 1
-          fi
-          echo "✅ JSON descargado a dash_payload_base.json"
-
-
       - name: Import Lakeview dashboard (PROD)
+        shell: bash
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
           DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}
+          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}   # <-- ya lo tienes creado
         run: |
           set -euo pipefail
 
-          # Ruta del JSON dentro del repo (ajústala si lo guardaste en otro lugar)
-          DASH_SRC="$GITHUB_WORKSPACE/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json
+          # 1) Ruta del JSON en TU repo
+          DASH_SRC="${GITHUB_WORKSPACE}/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json
 
-          echo "📁 Repo root: $GITHUB_WORKSPACE"
-          ls -la "$GITHUB_WORKSPACE" || true
-          ls -la "$GITHUB_WORKSPACE/dashboards" || true
-
-          if [ ! -f "$DASH_SRC" ]; then
-            echo "❌ No existe $DASH_SRC"
-            exit 1
+          echo "📁 Repo root: ${GITHUB_WORKSPACE}"
+          ls -la "${GITHUB_WORKSPACE}"
+          echo "🔎 Verificando JSON en ${DASH_SRC}"
+          if [ ! -f "${DASH_SRC}" ]; then
+             echo "❌ No existe ${DASH_SRC}"
+             exit 1
           fi
 
-          # Inyecta el warehouse de PROD en el payload
-          jq --arg wid "${WH_ID}" '.warehouse_id = $wid' "$DASH_SRC" > dash_payload.json
+          # 2) Validar que realmente es JSON y no vacío
+          if ! jq -e '.' "${DASH_SRC}" >/dev/null 2>&1; then
+             echo "❌ ${DASH_SRC} no es JSON válido"
+             exit 1
+          fi
+          echo "✅ JSON válido. Tamaño: $(wc -c < "${DASH_SRC}") bytes"
 
-          echo "⬆️ Importando dashboard a Lakeview…"
-          resp=$(curl -sS -X POST \
+          # 3) Intento 1: Lakeview Import API (si está habilitada en tu workspace)
+          echo "⬆️ Intentando Lakeview import API..."
+          IMPORT_RESP=$(
+            curl -sS -X POST \
+              -H "Authorization: Bearer ${DEST_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data-binary @"${DASH_SRC}" \
+              "${DEST_HOST}/api/2.0/lakeview/dashboards/import?warehouse_id=${WH_ID}" || true
+          )
+
+          echo "Respuesta import:"
+          echo "${IMPORT_RESP}" | jq . || echo "${IMPORT_RESP}"
+
+          DASH_ID=$(echo "${IMPORT_RESP}" | jq -r '.dashboard_id // .dashboardId // empty')
+
+          if [ -n "${DASH_ID}" ]; then
+            echo "✅ Lakeview dashboard importado. ID: ${DASH_ID}"
+            echo "🔗 Abre tu dashboard en Lakeview y verifica."
+            exit 0
+          fi
+
+          # 4) Si tu workspace aún NO expone el endpoint de Lakeview, subimos el JSON al Workspace
+          #    para que puedas importarlo manualmente desde la UI con 'Import from JSON'.
+          echo "ℹ️ Endpoint de Lakeview import no disponible. Subiendo el JSON al Workspace Files..."
+          WS_FILE_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboards"
+
+          # Crear carpeta padre por si no existe (Workspace API mkdirs)
+          curl -sS -X POST \
             -H "Authorization: Bearer ${DEST_TOKEN}" \
             -H "Content-Type: application/json" \
-            --data-binary @dash_payload.json \
-            "${DEST_HOST}/api/2.0/lakeview/dashboards")
+            -d "{\"path\":\"/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboards"}" \
+            "${DEST_HOST}/api/2.0/workspace/mkdirs" >/dev/null
 
-          echo "$resp" | jq . || true
+          # Importar el archivo como FILE en el Workspace
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${DEST_TOKEN}" \
+            -H "Content-Type: multipart/form-data" \
+            -F "path=${WS_FILE_PATH}" \
+            -F "overwrite=true" \
+            -F "format=AUTO" \
+            -F "content=@${DASH_SRC}" \
+            "${DEST_HOST}/api/2.0/workspace/import" >/dev/null
 
-          dash_id=$(echo "$resp" | jq -r '.dashboard_id // .id // empty')
-          if [ -z "$dash_id" ]; then
-            echo "❌ No se obtuvo dashboardId en la respuesta"
-           exit 1
-          fi
-
-          echo "✅ Dashboard importado: $dash_id"
-
-
+          echo "📄 JSON copiado a: ${WS_FILE_PATH}"
+          echo "👉 En la UI de Lakeview: New → Import dashboard from JSON → selecciona ese archivo."
+          exit 0
+  
       - name: Clean up
         run: |
           rm -rf notebooks_to_deploy
