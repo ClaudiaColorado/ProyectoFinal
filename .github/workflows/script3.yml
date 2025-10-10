@@ -330,31 +330,35 @@ jobs:
           echo "🔗 Verifica el estado en: $DEST_HOST/jobs/$JOB_ID/runs/$RUN_ID"
           echo "ℹ️  El workflow seguirá ejecutándose en Databricks"
           exit 0
-       # === DASHBOARD: Exportar desde ORIGEN (Workspace) y subir a DESTINO (Workspace) ===
+
       - name: Export Lakeview dashboard JSON (from ORIGIN)
-        env:
-         ORIGIN_HOST: ${{ secrets.DATABRICKS_ORIGIN_HOST }}
-         ORIGIN_TOKEN: ${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
         run: |
           set -euo pipefail
-          # Ruta EXACTA del dashboard en tu Workspace DEV
-          SRC_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboard/Data_Jobs_Salaries_and_Trends.lvdash.json"
+          ORIGIN_HOST=${{ secrets.DATABRICKS_ORIGIN_HOST }}
+          ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
 
-          echo "⬇️ Exportando ${SRC_PATH}..."
+          # Ruta EXACTA en DEV (ORIGIN) donde se guarda el .lvdash.json
+          WS_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboard/Data_Jobs_Salaries_and_Trends.lvdash.json"
+
+          # URL-encode del path para evitar "curl: (3) URL rejected"
+          ENC_WS_PATH=$(jq -rn --arg p "$WS_PATH" '$p|@uri')
+
+          echo "⬇️ Exportando ${WS_PATH}…"
           curl -sS -X GET \
-            -H "Authorization: Bearer ${ORIGIN_TOKEN}" \
-            "${ORIGIN_HOST}/api/2.0/workspace/export?path=${SRC_PATH}&format=SOURCE&direct_download=true" \
-            --output dash_from_ws.json
+           -H "Authorization: Bearer ${ORIGIN_TOKEN}" \
+           "${ORIGIN_HOST}/api/2.0/workspace/export?path=${ENC_WS_PATH}&format=SOURCE&direct_download=true" \
+           --output dash_from_ws.json
 
-          test -s dash_from_ws.json || { echo "❌ Export vacío"; exit 1; }
-          echo "✅ Export listo: $(wc -c < dash_from_ws.json) bytes"
+           test -s dash_from_ws.json || { echo "❌ Descarga vacía"; exit 1; }
+          echo "✅ Export listo: dash_from_ws.json"
 
 
-      - name: Create/Update & Publish Lakeview dashboard (PROD)
+      - name: Upsert Lakeview dashboard in PROD (no publish yet)
+        id: lakeview_upsert
         env:
           DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
           DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}   # 👈 se usa aquí
+          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}
         run: |
           set -euo pipefail
 
@@ -362,24 +366,25 @@ jobs:
           PARENT_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboards"
           DEST_PATH="${PARENT_PATH}/${DISPLAY_NAME}.lvdash.json"
 
-          # 0) Asegurar carpeta destino en Workspace PROD (solo directorio)
+          # Asegura carpeta destino (Workspace PROD)
           curl -sS -X POST \
             -H "Authorization: Bearer ${DEST_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "{\"path\":\"${PARENT_PATH}\"}" \
             "${DEST_HOST}/api/2.0/workspace/mkdirs" >/dev/null || true
 
-          # 1) Compactar el JSON exportado en una sola línea para serialized_dashboard
+          # Carga el JSON exportado y compáctalo como serialized_dashboard
           SD=$(jq -c . dash_from_ws.json)
 
-          # 2) ¿Ya existe en PROD? (por la ruta en Workspace)
+          # Detecta si YA existe por ruta (¡codificada!)
+          ENC_DEST_PATH=$(jq -rn --arg p "$DEST_PATH" '$p|@uri')
           st=$(curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
-            "${DEST_HOST}/api/2.0/workspace/get-status?path=${DEST_PATH}") || true
-          echo "🔎 get-status destino:"; echo "$st" | jq . || true
-          dash_id=$(echo "$st" | jq -r '.resource_id // empty')
+            "${DEST_HOST}/api/2.0/workspace/get-status?path=${ENC_DEST_PATH}") || true
+            echo "🔎 get-status:"; echo "$st" | jq . || true
+            dash_id=$(echo "$st" | jq -r '.resource_id // empty')
 
           if [[ -n "$dash_id" ]]; then
-            echo "🔁 Actualizando dashboard existente ${dash_id} (PATCH)..."
+            echo "🔁 PATCH dashboard ${dash_id}"
             payload=$(jq -n --arg dn "$DISPLAY_NAME" --arg wh "$WH_ID" --arg sd "$SD" \
               '{display_name:$dn, warehouse_id:$wh, serialized_dashboard:$sd}')
             resp=$(curl -sS -X PATCH \
@@ -388,32 +393,63 @@ jobs:
               --data "$payload" \
               "${DEST_HOST}/api/2.0/lakeview/dashboards/${dash_id}")
           else
-            echo "🆕 Creando dashboard (POST)..."
+            echo "🆕 POST (create)"
             payload=$(jq -n --arg dn "$DISPLAY_NAME" --arg wh "$WH_ID" --arg sd "$SD" --arg pp "$PARENT_PATH" \
-             '{display_name:$dn, warehouse_id:$wh, serialized_dashboard:$sd, parent_path:$pp}')
+              '{display_name:$dn, warehouse_id:$wh, serialized_dashboard:$sd, parent_path:$pp}')
             resp=$(curl -sS -X POST \
               -H "Authorization: Bearer ${DEST_TOKEN}" \
               -H "Content-Type: application/json" \
               --data "$payload" \
               "${DEST_HOST}/api/2.0/lakeview/dashboards")
-              dash_id=$(echo "$resp" | jq -r '.dashboard_id // empty')
+              dash_id=$(echo "$resp" | jq -r '.dashboard_id // .dashboardId // empty')
+
+              # Si devolvió RESOURCE_ALREADY_EXISTS, pide el id por get-status otra vez
+              if [[ -z "$dash_id" ]]; then
+                st2=$(curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
+                "${DEST_HOST}/api/2.0/workspace/get-status?path=${ENC_DEST_PATH}") || true
+                dash_id=$(echo "$st2" | jq -r '.resource_id // empty')
+              fi
           fi
 
-          echo "🧾 Respuesta create/update:"; echo "$resp" | jq .
+          echo "🧾 Respuesta:"; echo "$resp" | jq . || true
           test -n "$dash_id" || { echo "❌ No obtuve dashboard_id"; exit 1; }
- 
-          echo "🚀 Publicando ${dash_id}..."
-          pub=$(curl -sS -X POST \
+          echo "dashboard_id=${dash_id}" >> $GITHUB_OUTPUT
+          echo "✅ Upsert OK (dashboard_id=${dash_id})"
+
+      - name: Publish Lakeview dashboard (AFTER pipeline)
+        env:
+          DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
+          DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          DISPLAY_NAME="Data Jobs - Salaries and Trends"
+          PARENT_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboards"
+          DEST_PATH="${PARENT_PATH}/${DISPLAY_NAME}.lvdash.json"
+
+          dash_id="${{ steps.lakeview_upsert.outputs.dashboard_id }}"
+          if [[ -z "$dash_id" ]]; then
+            # Fallback por ruta (codificada)
+            ENC_DEST_PATH=$(jq -rn --arg p "$DEST_PATH" '$p|@uri')
+            st=$(curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
+                "${DEST_HOST}/api/2.0/workspace/get-status?path=${ENC_DEST_PATH}") || true
+                dash_id=$(echo "$st" | jq -r '.resource_id // empty')
+         fi
+
+         test -n "$dash_id" || { echo "❌ No pude obtener dashboard_id para publicar"; exit 1; }
+
+         echo  "🚀 Publicando ${dash_id}…"
+         pub=$(curl -sS -X POST \
             -H "Authorization: Bearer ${DEST_TOKEN}" \
             -H "Content-Type: application/json" \
             --data '{"embed_credentials": true}' \
             "${DEST_HOST}/api/2.0/lakeview/dashboards/${dash_id}/published")
-          echo "🧾 Respuesta publish:"; echo "$pub" | jq .
+         echo "🧾 Publish response:"; echo "$pub" | jq .
 
-          echo "🖼️ Abre en PROD (Workspace path):"
-          echo "${DEST_HOST}/workspace${DEST_PATH}"
-    
-      
+         echo "🖼️ Abre en PROD:"
+         echo "${DEST_HOST}/workspace${DEST_PATH}"
+
+  
       - name: Clean up
         run: |
           rm -rf notebooks_to_deploy
