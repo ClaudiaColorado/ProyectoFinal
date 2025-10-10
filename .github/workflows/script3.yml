@@ -1,4 +1,4 @@
-name: Dynamic Databricks Proyecto Final Deploy v5
+name: Dynamic Databricks Proyecto Final Deploy v6
 on:
   push:
     branches:
@@ -19,7 +19,7 @@ jobs:
           ORIGIN_HOST=${{ secrets.DATABRICKS_ORIGIN_HOST }}
           ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
           NOTEBOOK_BASE="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
-          NOTEBOOKS=("drop_medallion" "00_prep_env" "01_ingest" "02_transform" "03_load" "04_dashboard_setup" "Data_Jobs_Salaries_and_Trends.lvdash.json" )
+          NOTEBOOKS=("drop_medallion" "00_prep_env" "01_ingest" "02_transform" "03_load" "04_dashboard_setup")
           mkdir -p notebooks_to_deploy
           for nb in "${NOTEBOOKS[@]}"; do
             echo "Exportando $nb en modo raw..."
@@ -373,7 +373,7 @@ jobs:
             -d "{\"path\":\"${PARENT_PATH}\"}" \
             "${DEST_HOST}/api/2.0/workspace/mkdirs" >/dev/null || true
 
-          # Carga el JSON exportado y compáctalo como serialized_dashboard
+          # Carga el JSON exportado y compáctado como serialized_dashboard
           SD=$(jq -c . dash_from_ws.json)
 
           # Detecta si YA existe por ruta (¡codificada!)
