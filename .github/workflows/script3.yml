@@ -102,6 +102,96 @@ jobs:
           else
             echo "No se encontró workflow existente con nombre: $WORKFLOW_NAME"
           fi
+          # --- EXPORTA EL DASHBOARD DESDE ORIGEN (DEV) ---
+      - name: Export Lakeview dashboard JSON (from ORIGIN Workspace)
+        run: |
+        set -euo pipefail
+        ORIGIN_HOST=${{ secrets.DATABRICKS_ORIGIN_HOST }}
+        ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
+
+        # Ruta del archivo en el Workspace de ORIGEN (DEV)
+        DASH_WS_PATH="/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json"
+
+        mkdir -p dashboards_to_deploy
+
+        echo "🔎 Validando que existe ${DASH_WS_PATH} en ORIGEN..."
+        st=$(curl -sS -H "Authorization: Bearer ${ORIGIN_TOKEN}" \
+          "${ORIGIN_HOST}/api/2.0/workspace/get-status?path=${DASH_WS_PATH}")
+        echo "$st" | jq .
+        echo "$st" | jq -e 'select(.object_type=="FILE" or .object_type=="NOTEBOOK")' >/dev/null || {
+         echo "❌ No existe el archivo en ${DASH_WS_PATH}"; exit 1;
+        }
+
+        echo "⬇️ Exportando dashboard JSON desde ORIGEN..."
+        curl -sS -X GET \
+          -H "Authorization: Bearer ${ORIGIN_TOKEN}" \
+          "${ORIGIN_HOST}/api/2.0/workspace/export?path=${DASH_WS_PATH}&format=SOURCE&direct_download=true" \
+          --output dashboards_to_deploy/dashboard.json
+
+        test -s dashboards_to_deploy/dashboard.json || { echo "❌ Descarga vacía"; exit 1; }
+        echo "✅ Export listo: dashboards_to_deploy/dashboard.json"
+
+
+      # --- IMPORTA / CREA EL DASHBOARD EN PROD ---
+      - name: Import Lakeview dashboard (PROD)
+        env:
+          DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
+          DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
+          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}
+        run: |
+        set -euo pipefail
+
+        SRC="dashboards_to_deploy/dashboard.json"
+        test -s "${SRC}" || { echo "❌ No existe ${SRC}"; exit 1; }
+
+        # Inyecta warehouseId/dataSourceId si faltan
+        jq --arg wh "$WH_ID" '
+         if has("warehouseId") then .warehouseId=$wh else . + {"warehouseId":$wh} end
+         | (if has("dataSourceId") then .dataSourceId=$wh else . + {"dataSourceId":$wh} end)
+        ' "${SRC}" > dash_payload.json
+
+        CREATE_EP="${DEST_HOST%/}/api/2.0/lakeview/dashboards"
+
+        echo "⬆️ Creando dashboard en Lakeview (PROD)…"
+        resp=$(curl -s -w "\n%{http_code}" -X POST \
+          -H "Authorization: Bearer ${DEST_TOKEN}" \
+          -H "Content-Type: application/json" \
+         --data-binary @dash_payload.json \
+         "$CREATE_EP")
+
+        body=$(echo "$resp" | head -n -1)
+        code=$(echo "$resp" | tail -n1)
+
+        echo "$body" | jq .
+
+        dash_id=$(echo "$body" | jq -r '.dashboardId // .dashboard_id // .id // empty')
+        if [ -z "$dash_id" ] || { [ "$code" != "200" ] && [ "$code" != "201" ]; }; then
+          echo "⚠️ Lakeview API no disponible (HTTP $code) o payload no aceptado."
+          echo "   Aplico fallback: subir el JSON al Workspace de PROD para importarlo manualmente."
+
+          DEST_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboards/Data_Jobs_Salaries_and_Trends.lvdash.json"
+          # Asegura carpeta
+          curl -s -X POST -H "Authorization: Bearer ${DEST_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"path\":\"/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboards\"}" \
+            "${DEST_HOST}/api/2.0/workspace/mkdirs" >/dev/null
+
+          # Sube el JSON al Workspace de PROD
+          curl -s -X POST \
+            -H "Authorization: Bearer ${DEST_TOKEN}" \
+            -H "Content-Type: multipart/form-data" \
+            -F "path=${DEST_PATH}" \
+            -F "format=SOURCE" \
+            -F "overwrite=true" \
+            -F "content=@dash_payload.json" \
+            "${DEST_HOST}/api/2.0/workspace/import" >/dev/null
+
+            echo "📁 JSON disponible en: ${DEST_PATH}"
+            exit 0
+        fi
+
+        echo "✅ Dashboard creado en PROD. ID=${dash_id}"
+    
 
       - name: Get existing cluster ID
         run: |
@@ -330,46 +420,7 @@ jobs:
           echo "🔗 Verifica el estado en: $DEST_HOST/jobs/$JOB_ID/runs/$RUN_ID"
           echo "ℹ️  El workflow seguirá ejecutándose en Databricks"
           exit 0
-
-      - name: Download dashboard JSON from Workspace
-        env:
-          DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
-          DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-        run: |
-          set -euo pipefail
-          WS_PATH="/Workspace/Repos/claudiacoloradofc@gmail.com/ProyectoFinal/.github/workflows/Data_Jobs_Salaries_and_Trends.lvdash.json"
-          curl -sS -X GET \
-            -H "Authorization: Bearer ${DEST_TOKEN}" \
-            "${DEST_HOST}/api/2.0/workspace/export?path=${WS_PATH}&format=SOURCE&direct_download=true" \
-            --output dash_from_ws.json
-          test -s dash_from_ws.json || { echo "❌ Descarga vacía"; exit 1; }
-
-      - name: Import Lakeview dashboard (PROD)
-        env:
-          DEST_HOST: ${{ secrets.DATABRICKS_DEST_HOST }}
-          DEST_TOKEN: ${{ secrets.DATABRICKS_DEST_TOKEN }}
-          WH_ID: ${{ secrets.PROD_WAREHOUSE_ID }}
-        run: |
-          set -euo pipefail
-          DASH_SRC="${GITHUB_WORKSPACE}/dash_from_ws.json"   # ← mismo nombre que arriba
-          test -s "${DASH_SRC}" || { echo "❌ No existe ${DASH_SRC}"; exit 1; }
-
-          jq --arg wh "$WH_ID" '
-           if has("warehouseId") then .warehouseId=$wh else . + {"warehouseId":$wh} end
-           | (if has("dataSourceId") then .dataSourceId=$wh else . + {"dataSourceId":$wh} end)
-          ' "${DASH_SRC}" > dash_payload.json
-
-          resp=$(curl -sS -X POST \
-            -H "Authorization: Bearer ${DEST_TOKEN}" \
-            -H "Content-Type: application/json" \
-            --data-binary @dash_payload.json \
-            "${DEST_HOST}/api/2.0/lakeview/dashboards/import")
-          echo "${resp}" | jq .
-          dash_id=$(echo "${resp}" | jq -r '.dashboardId // .dashboard_id // empty')
-          test -n "${dash_id}" || { echo "❌ No se obtuvo dashboardId"; exit 1; }
-          echo "✅ Dashboard importado. dashboardId=${dash_id}"
-
-  
+      
       - name: Clean up
         run: |
           rm -rf notebooks_to_deploy
