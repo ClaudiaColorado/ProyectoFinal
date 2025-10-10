@@ -111,7 +111,7 @@ jobs:
           ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
 
           # Ruta del dashboard en ORIGEN (Workspace DEV)
-          ORIGIN_DASH_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboard"
+          ORIGIN_DASH_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboard/"
 
           mkdir -p dashboards_to_deploy
 
