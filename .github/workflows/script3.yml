@@ -104,36 +104,19 @@ jobs:
           fi
 
        # === DASHBOARD: Exportar desde ORIGEN (Workspace) y subir a DESTINO (Workspace) ===
-      - name: Export Lakeview dashboard JSON (from ORIGIN Workspace)
+      - name: Export Lakeview dashboard JSON 
         run: |
-          set -euo pipefail
           ORIGIN_HOST=${{ secrets.DATABRICKS_ORIGIN_HOST }}
           ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
-
-          # Ruta del dashboard en ORIGEN (Workspace DEV)
-          ORIGIN_DASH_PATH="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboard/Data_Jobs_Salaries_and_Trends.lvdash.json"
-
+          DASH_BASE="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/2_Dashboard"
+          DASHBOARDS="Data_Jobs_Salaries_and_Trends.lvdash.json"
           mkdir -p dashboards_to_deploy
-
-          echo "🔎 Validando que existe ${ORIGIN_DASH_PATH} en ORIGEN..."
-          st=$(curl -sS -H "Authorization: Bearer ${ORIGIN_TOKEN}" \
-              "${ORIGIN_HOST}/api/2.0/workspace/get-status?path=${ORIGIN_DASH_PATH}")
-          echo "$st" | jq .
-
-          # Acepta FILE o DASHBOARD 
-          echo "$st" | jq -e 'select(.object_type=="FILE" or .object_type=="DASHBOARD" or .object_type=="NOTEBOOK")' >/dev/null \
-            || { echo "❌ No se encontró el objeto en ${ORIGIN_DASH_PATH}"; exit 1; }
-
-          echo "⬇️ Exportando JSON..."
-          curl -sS -X GET \
-            -H "Authorization: Bearer ${ORIGIN_TOKEN}" \
-            "${ORIGIN_HOST}/api/2.0/workspace/export?path=${ORIGIN_DASH_PATH}&format=SOURCE&direct_download=true" \
+          echo "Exportando Dashboard en modo raw..."
+          curl -s -X GET \
+            -H "Authorization: Bearer $ORIGIN_TOKEN" \
+            "$ORIGIN_HOST/api/2.0/workspace/export?path=$DASH_BASE/$DASHBOARDS&format=SOURCE&direct_download=true" \
             --output dashboards_to_deploy/Data_Jobs_Salaries_and_Trends.lvdash.json
-
-            test -s dashboards_to_deploy/Data_Jobs_Salaries_and_Trends.lvdash.json \
-             || { echo "❌ Export vacío"; exit 1; }
-
-            echo "✅ Export listo → dashboards_to_deploy/Data_Jobs_Salaries_and_Trends.lvdash.json"
+          done
 
       - name: Upload dashboard JSON to DEST Workspace
         run: |
