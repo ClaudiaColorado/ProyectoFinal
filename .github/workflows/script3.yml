@@ -116,7 +116,7 @@ jobs:
             -H "Authorization: Bearer $ORIGIN_TOKEN" \
             "$ORIGIN_HOST/api/2.0/workspace/export?path=$DASH_BASE/$DASHBOARDS&format=SOURCE&direct_download=true" \
             --output dashboards_to_deploy/Data_Jobs_Salaries_and_Trends.lvdash.json
-          done
+          
 
       - name: Upload dashboard JSON to DEST Workspace
         run: |
