@@ -19,7 +19,7 @@ jobs:
           ORIGIN_HOST=${{ secrets.DATABRICKS_ORIGIN_HOST }}
           ORIGIN_TOKEN=${{ secrets.DATABRICKS_ORIGIN_TOKEN }}
           NOTEBOOK_BASE="/Workspace/Users/claudiacoloradofc@gmail.com/ProyectoFinal/1_Proceso"
-          NOTEBOOKS=("drop_medallion" "00_prep_env" "01_ingest" "02_transform" "03_load" "04_dashboard_setup")
+          NOTEBOOKS=("drop_medallion" "00_prep_env" "01_ingest" "02_transform" "03_load" "04_dashboard_setup" "Data_Jobs_Salaries_and_Trends.lvdash.json")
           mkdir -p notebooks_to_deploy
           for nb in "${NOTEBOOKS[@]}"; do
             echo "Exportando $nb en modo raw..."
