@@ -1,4 +1,4 @@
-name: Dynamic Databricks Proyecto Final Deploy v6
+name: Dynamic Databricks Proyecto Final Deploy v7
 on:
   push:
     branches:
