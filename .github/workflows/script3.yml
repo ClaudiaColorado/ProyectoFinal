@@ -434,20 +434,20 @@ jobs:
             st=$(curl -sS -H "Authorization: Bearer ${DEST_TOKEN}" \
                 "${DEST_HOST}/api/2.0/workspace/get-status?path=${ENC_DEST_PATH}") || true
                 dash_id=$(echo "$st" | jq -r '.resource_id // empty')
-         fi
+          fi
 
-         test -n "$dash_id" || { echo "❌ No pude obtener dashboard_id para publicar"; exit 1; }
+          test -n "$dash_id" || { echo "❌ No pude obtener dashboard_id para publicar"; exit 1; }
 
-         echo  "🚀 Publicando ${dash_id}…"
-         pub=$(curl -sS -X POST \
+          echo  "🚀 Publicando ${dash_id}…"
+          pub=$(curl -sS -X POST \
             -H "Authorization: Bearer ${DEST_TOKEN}" \
             -H "Content-Type: application/json" \
             --data '{"embed_credentials": true}' \
             "${DEST_HOST}/api/2.0/lakeview/dashboards/${dash_id}/published")
-         echo "🧾 Publish response:"; echo "$pub" | jq .
+          echo "🧾 Publish response:"; echo "$pub" | jq .
 
-         echo "🖼️ Abre en PROD:"
-         echo "${DEST_HOST}/workspace${DEST_PATH}"
+          echo "🖼️ Abre en PROD:"
+          echo "${DEST_HOST}/workspace${DEST_PATH}"
 
   
       - name: Clean up
